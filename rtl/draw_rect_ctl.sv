@@ -1,97 +1,72 @@
 `timescale 1ns / 1ps
 
-module draw_rect_ctl #(
-    parameter int TICK_LIMIT = 666665 
-)(
+module draw_rect_ctl (
     input  logic clk,
     input  logic rst_n,
-    input  logic mouse_left,
+    input  logic mouse_right,     
     input  logic [11:0] mouse_xpos,
     input  logic [11:0] mouse_ypos,
+    input  logic vsync,
     output logic [11:0] xpos,
     output logic [11:0] ypos
 );
 
-    import vga_pkg::*;
-
-    localparam int LOGO_HEIGHT = 64;
-    localparam int BOTTOM_WALL = 600 - LOGO_HEIGHT;
+    // Rejestry pozycji gracza i celu
+    logic [11:0] player_x, player_y;
+    logic [11:0] target_x, target_y;
     
-    // Poprawna stała grawitacji
-    localparam signed [23:0] GRAVITY = 24'h00_5733; 
+    // Rejestry do wykrywania zboczy
+    logic right_click_prev;
+    logic vsync_prev;
 
-    // Rejestry dla osi Y (pozycja i prędkość z ułamkami)
-    logic signed [23:0] y_pos_q, y_pos_nxt;
-    logic signed [23:0] y_vel_q, y_vel_nxt;
-
-    // Rejestry dla osi X 
-    logic [11:0] x_pos_q, x_pos_nxt;
-
-    // Generator impulsu 60 Hz
-    logic [19:0] tick_cnt;
-    logic physics_tick;
+    // Prędkość postaci 
+    logic [3:0] player_speed; 
+    assign player_speed = 4'd3; // 3 piksele na klatkę
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            tick_cnt <= '0;
-            physics_tick <= 1'b0;
+            player_x <= 12'd400; // Środek ekranu 800x600
+            player_y <= 12'd300;
+            target_x <= 12'd400;
+            target_y <= 12'd300;
+            right_click_prev <= 1'b0;
+            vsync_prev <= 1'b0;
         end else begin
-            if (tick_cnt == TICK_LIMIT) begin
-                tick_cnt <= '0;
-                physics_tick <= 1'b1;
-            end else begin
-                tick_cnt <= tick_cnt + 1'b1;
-                physics_tick <= 1'b0;
+            right_click_prev <= mouse_right;
+            vsync_prev <= vsync;
+
+            // Ustawienie nowego celu po wciśnięciu PPM (wykrycie zbocza narastającego)
+            if (mouse_right && !right_click_prev) begin
+                target_x <= mouse_xpos;
+                target_y <= mouse_ypos;
+            end
+
+            // Ruch postaci (wykonuje się tylko raz na klatkę obrazu, gdy vsync idzie w górę)
+            if (vsync && !vsync_prev) begin
+                
+                // Ruch w osi X
+                if (player_x < target_x) begin
+                    if (target_x - player_x <= player_speed) player_x <= target_x;
+                    else player_x <= player_x + player_speed;
+                end else if (player_x > target_x) begin
+                    if (player_x - target_x <= player_speed) player_x <= target_x;
+                    else player_x <= player_x - player_speed;
+                end
+                
+                // Ruch w osi Y
+                if (player_y < target_y) begin
+                    if (target_y - player_y <= player_speed) player_y <= target_y;
+                    else player_y <= player_y + player_speed;
+                end else if (player_y > target_y) begin
+                    if (player_y - target_y <= player_speed) player_y <= target_y;
+                    else player_y <= player_y - player_speed;
+                end
             end
         end
     end
 
-    // Rejestry stanu (Pamięć pozycji)
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            y_pos_q <= '0;
-            y_vel_q <= '0;
-            x_pos_q <= '0;
-        end else begin
-            y_pos_q <= y_pos_nxt;
-            y_vel_q <= y_vel_nxt;
-            x_pos_q <= x_pos_nxt;
-        end
-    end
-
-    // Logika fizyki
-    always_comb begin
-        y_pos_nxt = y_pos_q;
-        y_vel_nxt = y_vel_q;
-        x_pos_nxt = x_pos_q;
-
-        if (mouse_left == 1'b0) begin
-            // Logo podąża za myszą
-            y_pos_nxt = {mouse_ypos, 12'b0};
-            y_vel_nxt = '0;
-            x_pos_nxt = mouse_xpos;
-        end else if (physics_tick) begin
-            // Krok symulacji (swobodny spadek)
-            
-            y_vel_nxt = y_vel_q + GRAVITY;
-            y_pos_nxt = y_pos_q + y_vel_nxt;
-
-            // Kolizja z dnem
-            if (y_pos_nxt[23:12] >= BOTTOM_WALL) begin
-                y_pos_nxt = {BOTTOM_WALL[11:0], 12'b0};
-                // 48-bitowe rzutowanie chroniące przed błędem overflow
-                y_vel_nxt = -( (y_vel_nxt * 48'sd819) >>> 10 ); 
-            end
-
-            // Zabezpieczenie przed ucieczką górą
-            if (y_pos_nxt < 0) begin
-                y_pos_nxt = 0;
-                y_vel_nxt = -( (y_vel_nxt * 48'sd819) >>> 10 );
-            end
-        end
-    end
-
-    assign xpos = x_pos_q; 
-    assign ypos = y_pos_q[23:12];
+    // Przypisanie do wyjść
+    assign xpos = player_x;
+    assign ypos = player_y;
 
 endmodule

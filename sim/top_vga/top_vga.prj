@@ -12,15 +12,8 @@
 sv work ../../rtl/vga_pkg.sv \
         ../../rtl/vga_if.sv \
         ../../rtl/vga_timing.sv \
-        ../../rtl/draw_bg.sv \
-        ../../rtl/draw_rect.sv \
-        ../../rtl/image_rom.sv \
         ../../rtl/draw_rect_ctl.sv \
         ../../rtl/draw_mouse.sv \
-        ../../rtl/char_rom.sv \
-        ../../rtl/font_rom.sv \
-        ../../rtl/delay.sv \
-        ../../rtl/draw_rect_char.sv \
         ../../rtl/top_vga.sv \
         ../common/tiff_writer.sv \
         ./top_vga_tb.sv
