@@ -11,61 +11,78 @@ module draw_rect_ctl (
     output logic [11:0] ypos
 );
 
-    // Rejestry pozycji gracza i celu
-    logic [11:0] player_x, player_y;
-    logic [11:0] target_x, target_y;
+    // Zasada MTM: Parametry dużymi literami
+    localparam PLAYER_START_X = 12'd512;
+    localparam PLAYER_START_Y = 12'd384;
+    localparam PLAYER_SPEED   = 12'd3;
+
+    // Zasada MTM: Sygnały kombinacyjne z sufiksem _nxt
+    logic [11:0] player_x, player_x_nxt;
+    logic [11:0] player_y, player_y_nxt;
+    logic [11:0] target_x, target_x_nxt;
+    logic [11:0] target_y, target_y_nxt;
     
-    // Rejestry do wykrywania zboczy
-    logic right_click_prev;
-    logic vsync_prev;
+    logic right_click_prev, right_click_prev_nxt;
+    logic vsync_prev, vsync_prev_nxt;
 
-    // Prędkość postaci 
-    logic [3:0] player_speed; 
-    assign player_speed = 4'd3; // 3 piksele na klatkę
-
-    always_ff @(posedge clk or negedge rst_n) begin
+    // 1. Blok sekwencyjny - WYŁĄCZNIE reset synchroniczny i przepisywanie _nxt
+    always_ff @(posedge clk) begin : seq_blk
         if (!rst_n) begin
-            player_x <= 12'd512; 
-            player_y <= 12'd384;
-            target_x <= 12'd512;
-            target_y <= 12'd384;
+            player_x <= PLAYER_START_X;
+            player_y <= PLAYER_START_Y;
+            target_x <= PLAYER_START_X;
+            target_y <= PLAYER_START_Y;
             right_click_prev <= 1'b0;
             vsync_prev <= 1'b0;
         end else begin
-            right_click_prev <= mouse_right;
-            vsync_prev <= vsync;
+            player_x <= player_x_nxt;
+            player_y <= player_y_nxt;
+            target_x <= target_x_nxt;
+            target_y <= target_y_nxt;
+            right_click_prev <= right_click_prev_nxt;
+            vsync_prev <= vsync_prev_nxt;
+        end
+    end
 
-            // Ustawienie nowego celu po wciśnięciu PPM (wykrycie zbocza narastającego)
-            if (mouse_right && !right_click_prev) begin
-                target_x <= mouse_xpos;
-                target_y <= mouse_ypos;
+    // 2. Blok kombinacyjny - wyliczanie logiki
+    always_comb begin : comb_blk
+        // Domyślne przypisania zapobiegające powstawaniu zatrzasków (latches)
+        player_x_nxt = player_x;
+        player_y_nxt = player_y;
+        target_x_nxt = target_x;
+        target_y_nxt = target_y;
+        right_click_prev_nxt = mouse_right;
+        vsync_prev_nxt = vsync;
+
+        // Reakcja na kliknięcie PPM
+        if (mouse_right && !right_click_prev) begin
+            target_x_nxt = mouse_xpos;
+            target_y_nxt = mouse_ypos;
+        end
+
+        // Ruch postaci aktualizowany co klatkę (zbocze narastające vsync)
+        if (vsync && !vsync_prev) begin
+            
+            // Ruch w osi X
+            if (player_x < target_x) begin
+                if (target_x - player_x <= PLAYER_SPEED) player_x_nxt = target_x;
+                else player_x_nxt = player_x + PLAYER_SPEED;
+            end else if (player_x > target_x) begin
+                if (player_x - target_x <= PLAYER_SPEED) player_x_nxt = target_x;
+                else player_x_nxt = player_x - PLAYER_SPEED;
             end
-
-            // Ruch postaci (wykonuje się tylko raz na klatkę obrazu, gdy vsync idzie w górę)
-            if (vsync && !vsync_prev) begin
-                
-                // Ruch w osi X
-                if (player_x < target_x) begin
-                    if (target_x - player_x <= player_speed) player_x <= target_x;
-                    else player_x <= player_x + player_speed;
-                end else if (player_x > target_x) begin
-                    if (player_x - target_x <= player_speed) player_x <= target_x;
-                    else player_x <= player_x - player_speed;
-                end
-                
-                // Ruch w osi Y
-                if (player_y < target_y) begin
-                    if (target_y - player_y <= player_speed) player_y <= target_y;
-                    else player_y <= player_y + player_speed;
-                end else if (player_y > target_y) begin
-                    if (player_y - target_y <= player_speed) player_y <= target_y;
-                    else player_y <= player_y - player_speed;
-                end
+            
+            // Ruch w osi Y
+            if (player_y < target_y) begin
+                if (target_y - player_y <= PLAYER_SPEED) player_y_nxt = target_y;
+                else player_y_nxt = player_y + PLAYER_SPEED;
+            end else if (player_y > target_y) begin
+                if (player_y - target_y <= PLAYER_SPEED) player_y_nxt = target_y;
+                else player_y_nxt = player_y - PLAYER_SPEED;
             end
         end
     end
 
-    // Przypisanie do wyjść
     assign xpos = player_x;
     assign ypos = player_y;
 
