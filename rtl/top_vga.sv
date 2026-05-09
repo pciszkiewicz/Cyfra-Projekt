@@ -65,9 +65,9 @@ module top_vga (
         m_state_nxt = m_state; m_set_x_nxt = m_set_x; m_set_y_nxt = m_set_y; m_cfg_val_nxt = m_cfg_val;
         case (m_state)
             ST_INIT_START: m_state_nxt = ST_SET_X;
-            ST_SET_X: begin m_cfg_val_nxt = 12'd799; m_set_x_nxt = 1'b1; m_state_nxt = ST_WAIT_X; end
+            ST_SET_X: begin m_cfg_val_nxt = 12'd1023; m_set_x_nxt = 1'b1; m_state_nxt = ST_WAIT_X; end
             ST_WAIT_X: begin m_set_x_nxt = 1'b0; m_state_nxt = ST_SET_Y; end
-            ST_SET_Y: begin m_cfg_val_nxt = 12'd599; m_set_y_nxt = 1'b1; m_state_nxt = ST_WAIT_Y; end
+            ST_SET_Y: begin m_cfg_val_nxt = 12'd767; m_set_y_nxt = 1'b1; m_state_nxt = ST_WAIT_Y; end
             ST_WAIT_Y: begin m_set_y_nxt = 1'b0; m_state_nxt = ST_DONE; end
             ST_DONE: begin m_set_x_nxt = 1'b0; m_set_y_nxt = 1'b0; end
             default: m_state_nxt = ST_INIT_START;

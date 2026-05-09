@@ -25,10 +25,10 @@ module draw_rect_ctl (
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            player_x <= 12'd400; // Środek ekranu 800x600
-            player_y <= 12'd300;
-            target_x <= 12'd400;
-            target_y <= 12'd300;
+            player_x <= 12'd512; 
+            player_y <= 12'd384;
+            target_x <= 12'd512;
+            target_y <= 12'd384;
             right_click_prev <= 1'b0;
             vsync_prev <= 1'b0;
         end else begin
