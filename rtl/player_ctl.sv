@@ -1,69 +1,61 @@
-`timescale 1 ns / 1 ps
+/**
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Player control module handling movement and collision detection.
+ */
 
 module player_ctl (
     input  logic        clk,
-    input  logic        rst,
-    input  logic        frame_tick,
+    input  logic        rst_n,
+    output logic [9:0]  map_addr,
+    output logic [11:0] player_x,
+    output logic [11:0] player_y,
+    input  logic [10:0] vcount,
+    input  logic [10:0] hcount,
     input  logic [9:0]  mouse_x,
     input  logic [9:0]  mouse_y,
     input  logic        mouse_rmb,
-
-    // Interfejs do sprawdzania kolizji
-    output logic [9:0]  map_addr,    
-    input  logic        is_wall,     
-
-    output logic [11:0] player_x,
-    output logic [11:0] player_y
+    input  logic        is_wall
 );
 
-    localparam SPEED = 12'd4;
-    localparam CENTER_X = 10'd512;
-    localparam CENTER_Y = 10'd384;
-    localparam START_X = 12'd160;  // Twoje wartości startowe
-    localparam START_Y = 12'd992;  //
+localparam logic [11:0] SPEED    = 12'd4;
+localparam logic [9:0]  CENTER_X = 10'd512;
+localparam logic [9:0]  CENTER_Y = 10'd384;
 
-    logic [11:0] px_reg, py_reg;
-    logic [11:0] test_x, test_y;
+logic [11:0] px_reg, px_nxt, py_reg, py_nxt;
+logic        frame_tick;
 
-    // 1. Logika wyboru kafelka do sprawdzenia (Kombinacyjna)
-    // Sprawdzamy kafelek, na który CHCEMY wejść
-    always_comb begin
-        test_x = px_reg;
-        test_y = py_reg;
+assign frame_tick = (vcount == 11'd0 && hcount == 11'd0);
 
-        if (mouse_rmb) begin
-            if (mouse_x > CENTER_X + 20)      test_x = px_reg + SPEED + 16;
-            else if (mouse_x < CENTER_X - 20) test_x = px_reg - SPEED - 16;
-            
-            if (mouse_y > CENTER_Y + 20)      test_y = py_reg + SPEED + 16;
-            else if (mouse_y < CENTER_Y - 20) test_y = py_reg - SPEED - 16;
-        end
-        
-        // Adres dla map_rom (Y[10:6], X[10:6])
-        map_addr = {test_y[10:6], test_x[10:6]}; 
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        px_reg <= 12'd160;
+        py_reg <= 12'd992;
+    end else begin
+        px_reg <= px_nxt;
+        py_reg <= py_nxt;
     end
+end
 
-    // 2. Logika ruchu (Sekwencyjna)
-    // Tu is_wall odnosi się do adresu wystawionego w poprzednim takcie
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            px_reg <= START_X;
-            py_reg <= START_Y;
-        end else if (frame_tick && mouse_rmb) begin
-            // Jeśli pamięć ROM mówi, że tam NIE MA ściany, wykonaj ruch
-            if (!is_wall) begin
-                 // Ruch X
-                 if (mouse_x > CENTER_X + 20)      px_reg <= px_reg + SPEED;
-                 else if (mouse_x < CENTER_X - 20) px_reg <= px_reg - SPEED;
+always_comb begin
+    px_nxt = px_reg;
+    py_nxt = py_reg;
+    
+    // map_addr wystawiony teraz, is_wall przyjdzie w następnym takcie
+    map_addr = {py_reg[10:6], px_reg[10:6]}; 
 
-                 // Ruch Y
-                 if (mouse_y > CENTER_Y + 20)      py_reg <= py_reg + SPEED;
-                 else if (mouse_y < CENTER_Y - 20) py_reg <= py_reg - SPEED;
-            end
-        end
+    if (frame_tick && mouse_rmb && !is_wall) begin
+        if (mouse_x > CENTER_X + 10'd20)      px_nxt = px_reg + SPEED;
+        else if (mouse_x < CENTER_X - 10'd20) px_nxt = px_reg - SPEED;
+
+        if (mouse_y > CENTER_Y + 10'd20)      py_nxt = py_reg + SPEED;
+        else if (mouse_y < CENTER_Y - 10'd20) py_nxt = py_reg - SPEED;
     end
+end
 
-    assign player_x = px_reg;
-    assign player_y = py_reg;
+assign player_x = px_reg;
+assign player_y = py_reg;
 
 endmodule

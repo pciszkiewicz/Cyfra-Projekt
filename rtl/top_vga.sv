@@ -1,218 +1,224 @@
 /**
- * Autorzy:
- * Opis: Główny moduł strukturalny projektu (top_vga). 
- * Odpowiada za integrację kontrolerów, logiki gry oraz potoku wyświetlania VGA.
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Top VGA structural module.
  */
 
- module top_vga (
-    input  logic clk,              /* Zegar pikseli 40 MHz */
-    input  logic clk100MHz,        /* Zegar systemowy 100 MHz */
-    input  logic rst_pclk,         /* Reset synchroniczny dla domeny 40 MHz */
-    input  logic rst_100m,         /* Reset synchroniczny dla domeny 100 MHz */
-    inout  wire  ps2_clk,          /* Linie interfejsu PS/2 */
-    inout  wire  ps2_data,
-    output logic vs,               /* Wyjścia VGA synchronizacja pionowa */
-    output logic hs,               /* Wyjścia VGA synchronizacja pozioma */
-    output logic [3:0] r,          /* Wyjścia VGA kolory R, G, B */
+ module top_vga
+    import vga_pkg::*;
+(
+    input  logic       clk,
+    input  logic       clk100MHz,
+    input  logic       rst_pclk_n,
+    input  logic       rst_100m_n,
+    output logic       vs,
+    output logic       hs,
+    output logic [3:0] r,
     output logic [3:0] g,
-    output logic [3:0] b
+    output logic [3:0] b,
+    inout  wire        ps2_clk,
+    inout  wire        ps2_data
 );
 
-    import vga_pkg::*;             /* Import stałych z pakietu */
+typedef enum logic [2:0] {
+    ST_INIT_START = 3'd0,
+    ST_SET_X      = 3'd1,
+    ST_WAIT_X     = 3'd2,
+    ST_SET_Y      = 3'd3,
+    ST_WAIT_Y     = 3'd4,
+    ST_DONE       = 3'd5
+} mouse_cfg_state_t;
 
-    /* Definicje typów i stałych lokalnych */
-    typedef enum logic [2:0] {
-        ST_INIT_START, 
-        ST_SET_X, 
-        ST_WAIT_X, 
-        ST_SET_Y, 
-        ST_WAIT_Y, 
-        ST_DONE
-    } mouse_cfg_state_t;           /* Sufiks _t dla typów */
+logic [11:0] mouse_x_raw;
+logic [11:0] mouse_y_raw;
+logic        mouse_right_raw;
+logic        mouse_left_raw;
 
-    /* Sygnały lokalne i interfejsy */
-    wire [11:0]  mouse_x_raw, mouse_y_raw;
-    wire         mouse_right_raw, mouse_left_raw;
+logic [11:0] mouse_x_sync1;
+logic [11:0] mouse_x_sync2;
+logic [11:0] mouse_y_sync1;
+logic [11:0] mouse_y_sync2;
+logic        mouse_right_sync1;
+logic        mouse_right_sync2;
+logic        mouse_left_sync1;
+logic        mouse_left_sync2;
 
-    logic [11:0] mouse_x_sync1, mouse_x_sync2;
-    logic [11:0] mouse_y_sync1, mouse_y_sync2;
-    logic        mouse_right_sync1, mouse_right_sync2;
-    logic        mouse_left_sync1, mouse_left_sync2;
+mouse_cfg_state_t m_state;
+mouse_cfg_state_t m_state_nxt;
+logic [11:0] m_cfg_val;
+logic [11:0] m_cfg_val_nxt;
+logic        m_set_x;
+logic        m_set_x_nxt;
+logic        m_set_y;
+logic        m_set_y_nxt;
 
-    mouse_cfg_state_t m_state, m_state_nxt;
-    logic [11:0] m_cfg_val, m_cfg_val_nxt;
-    logic        m_set_x, m_set_x_nxt;
-    logic        m_set_y, m_set_y_nxt;
+logic [31:0] active_crates;
+logic [1:0]  current_state;
+logic [11:0] player_x;
+logic [11:0] player_y;
 
-    logic [31:0] active_crates;
-    logic [1:0]  current_state;
-    logic [11:0] player_x, player_y;
-    logic [9:0]  map_addr;
-    logic        is_wall;
+logic [9:0]  map_addr_vga;
+logic        is_wall_vga;
+logic [9:0]  map_addr_player;
+logic        is_wall_player;
 
-    vga_if timing_to_render();     /* Interfejsy VGA */
-    vga_if render_to_mouse();
-    vga_if mouse_to_out();
+vga_if timing_to_render();
+vga_if render_to_mouse();
+vga_if mouse_to_out();
 
+assign vs = mouse_to_out.vsync;
+assign hs = mouse_to_out.hsync;
+assign {r, g, b} = mouse_to_out.rgb;
 
-    /* Przypisania wyjść */
-    assign vs = mouse_to_out.vsync;
-    assign hs = mouse_to_out.hsync;
-    assign {r, g, b} = mouse_to_out.rgb;
+always_ff @(posedge clk or negedge rst_pclk_n) begin
+    if (!rst_pclk_n) begin
+        mouse_x_sync1     <= 12'h0;
+        mouse_x_sync2     <= 12'h0;
+        mouse_y_sync1     <= 12'h0;
+        mouse_y_sync2     <= 12'h0;
+        mouse_right_sync1 <= 1'b0;
+        mouse_right_sync2 <= 1'b0;
+        mouse_left_sync1  <= 1'b0;
+        mouse_left_sync2  <= 1'b0;
+    end else begin
+        mouse_x_sync1     <= mouse_x_raw;
+        mouse_x_sync2     <= mouse_x_sync1;
+        mouse_y_sync1     <= mouse_y_raw;
+        mouse_y_sync2     <= mouse_y_sync1;
+        mouse_right_sync1 <= mouse_right_raw;
+        mouse_right_sync2 <= mouse_right_sync1;
+        mouse_left_sync1  <= mouse_left_raw;
+        mouse_left_sync2  <= mouse_left_sync1;
+    end
+end
 
+always_ff @(posedge clk100MHz or negedge rst_100m_n) begin
+    if (!rst_100m_n) begin
+        m_state   <= ST_INIT_START;
+        m_set_x   <= 1'b0;
+        m_set_y   <= 1'b0;
+        m_cfg_val <= 12'h0;
+    end else begin
+        m_state   <= m_state_nxt;
+        m_set_x   <= m_set_x_nxt;
+        m_set_y   <= m_set_y_nxt;
+        m_cfg_val <= m_cfg_val_nxt;
+    end
+end
 
-    /* CDC - Synchronizacja sygnałów myszy (z domeny 100MHz do 40MHz) */
-    always_ff @(posedge clk) begin
-        if (rst_pclk) begin
-            mouse_x_sync1     <= '0;
-            mouse_x_sync2     <= '0;
-            mouse_y_sync1     <= '0;
-            mouse_y_sync2     <= '0;
-            mouse_right_sync1 <= '0;
-            mouse_right_sync2 <= '0;
-            mouse_left_sync1  <= '0;
-            mouse_left_sync2  <= '0;
-        end else begin
-            mouse_x_sync1     <= mouse_x_raw;
-            mouse_x_sync2     <= mouse_x_sync1;
-            mouse_y_sync1     <= mouse_y_raw;
-            mouse_y_sync2     <= mouse_y_sync1;
-            mouse_right_sync1 <= mouse_right_raw;
-            mouse_right_sync2 <= mouse_right_sync1;
-            mouse_left_sync1  <= mouse_left_raw;
-            mouse_left_sync2  <= mouse_left_sync1;
+always_comb begin
+    m_state_nxt   = m_state;
+    m_set_x_nxt   = 1'b0;
+    m_set_y_nxt   = 1'b0;
+    m_cfg_val_nxt = m_cfg_val;
+
+    case (m_state)
+        ST_INIT_START: begin
+            m_state_nxt = ST_SET_X;
         end
-    end
-
-
-    /* Logika konfiguracji myszy (Domena 100 MHz) */
-    always_ff @(posedge clk100MHz) begin
-        if (rst_100m) begin
-            m_state   <= ST_INIT_START;
-            m_set_x   <= 1'b0;
-            m_set_y   <= 1'b0;
-            m_cfg_val <= 12'd0;
-        end else begin
-            m_state   <= m_state_nxt;
-            m_set_x   <= m_set_x_nxt;
-            m_set_y   <= m_set_y_nxt;
-            m_cfg_val <= m_cfg_val_nxt;
+        ST_SET_X: begin
+            m_cfg_val_nxt = MOUSE_MAX_X;
+            m_set_x_nxt   = 1'b1;
+            m_state_nxt   = ST_WAIT_X;
         end
-    end
+        ST_WAIT_X: begin
+            m_state_nxt = ST_SET_Y;
+        end
+        ST_SET_Y: begin
+            m_cfg_val_nxt = MOUSE_MAX_Y;
+            m_set_y_nxt   = 1'b1;
+            m_state_nxt   = ST_WAIT_Y;
+        end
+        ST_WAIT_Y: begin
+            m_state_nxt = ST_DONE;
+        end
+        ST_DONE: begin
+        end
+        default: begin
+            m_state_nxt = ST_INIT_START;
+        end
+    endcase
+end
 
-    always_comb begin
-        m_state_nxt   = m_state;
-        m_set_x_nxt   = 1'b0;
-        m_set_y_nxt   = 1'b0;
-        m_cfg_val_nxt = m_cfg_val;
+MouseCtl u_mouse_ctl (
+    .clk(clk100MHz),
+    .rst(~rst_100m_n),
+    .ps2_clk(ps2_clk),
+    .ps2_data(ps2_data),
+    .xpos(mouse_x_raw),
+    .ypos(mouse_y_raw),
+    .right(mouse_right_raw),
+    .left(mouse_left_raw),
+    .value(m_cfg_val),
+    .setmax_x(m_set_x),
+    .setmax_y(m_set_y),
+    .setx(1'b0),
+    .sety(1'b0),
+    .zpos(),
+    .middle(),
+    .new_event()
+);
 
-        case (m_state)
-            ST_INIT_START: m_state_nxt = ST_SET_X;
-            
-            ST_SET_X: begin
-                m_cfg_val_nxt = MOUSE_MAX_X;
-                m_set_x_nxt   = 1'b1;
-                m_state_nxt   = ST_WAIT_X;
-            end
-            
-            ST_WAIT_X: m_state_nxt = ST_SET_Y;
-            
-            ST_SET_Y: begin
-                m_cfg_val_nxt = MOUSE_MAX_Y;
-                m_set_y_nxt   = 1'b1;
-                m_state_nxt   = ST_WAIT_Y;
-            end
-            
-            ST_WAIT_Y: m_state_nxt = ST_DONE;
-            
-            ST_DONE:   /* Konfiguracja zakończona */;
-            
-            default: m_state_nxt = ST_INIT_START;
-        endcase
-    end
+game_logic_top u_game_logic (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .active_crates(active_crates),
+    .current_state(current_state),
+    .start_btn(mouse_left_sync2),
+    .phase_timeout(1'b0),
+    .crates_hit_mask(32'h0)
+);
 
+player_ctl u_player_ctl (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .map_addr(map_addr_player),
+    .player_x(player_x),
+    .player_y(player_y),
+    .vcount(timing_to_render.vcount),
+    .hcount(timing_to_render.hcount),
+    .mouse_x(mouse_x_sync2[9:0]),
+    .mouse_y(mouse_y_sync2[9:0]),
+    .mouse_rmb(mouse_right_sync2),
+    .is_wall(is_wall_player)
+);
 
-    /* Instancje modułów */
+map_rom u_map_rom (
+    .clk(clk),
+    // Port A (VGA Renderer)
+    .addr_a(map_addr_vga),
+    .is_wall_a(is_wall_vga),
+    // Port B (Player Physics)
+    .addr_b(map_addr_player),
+    .is_wall_b(is_wall_player)
+);
 
-    /* Kontroler myszy (VHDL) */
-    MouseCtl u_mouse_ctl (
-        .clk      (clk100MHz),
-        .rst      (rst_100m),
-        .ps2_clk  (ps2_clk),
-        .ps2_data (ps2_data),
-        .xpos     (mouse_x_raw),
-        .ypos     (mouse_y_raw),
-        .right    (mouse_right_raw),
-        .left     (mouse_left_raw),
-        .value    (m_cfg_val),
-        .setmax_x (m_set_x),
-        .setmax_y (m_set_y),
-        .setx     (1'b0),
-        .sety     (1'b0),
-        .zpos     (),
-        .middle   (),
-        .new_event()
-    );
+vga_timing u_vga_timing (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .out(timing_to_render.out)
+);
 
-    /* Główna logika gry */
-    game_logic_top u_game_logic (
-        .clk             (clk),
-        .rst             (rst_pclk),
-        .start_btn       (mouse_left_sync2),
-        .phase_timeout   (1'b0),
-        .crates_hit_mask (32'b0),
-        .active_crates   (active_crates),
-        .current_state   (current_state)
-    );
+draw_map u_draw_map (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .map_addr(map_addr_vga),
+    .out(render_to_mouse.out),
+    .in(timing_to_render.in),
+    .player_x(player_x),
+    .player_y(player_y),
+    .is_wall(is_wall_vga)
+);
 
-    /* Kontroler ruchu gracza */
-    player_ctl u_player_ctl (
-        .clk        (clk),
-        .rst        (rst_pclk),
-        .frame_tick (timing_to_render.vsync && !timing_to_render.vblnk),
-        .mouse_x    (mouse_x_sync2[9:0]),
-        .mouse_y    (mouse_y_sync2[9:0]),
-        .mouse_rmb  (mouse_right_sync2),
-        .is_wall    (is_wall),
-        .map_addr   (map_addr),
-        .player_x   (player_x),
-        .player_y   (player_y)
-    );
-
-    /* Pamięć ścian mapy */
-    map_rom u_map_rom (
-        .clk     (clk),
-        .addr    (map_addr),
-        .is_wall (is_wall)
-    );
-
-
-    /* Potok wyświetlania VGA */
-
-    vga_timing u_vga_timing (
-        .clk   (clk),
-        .rst   (rst_pclk),
-        .out   (timing_to_render.out)
-    );
-
-    draw_map u_draw_map (
-        .clk      (clk),
-        .rst      (rst_pclk),
-        .in       (timing_to_render.in),
-        .out      (render_to_mouse.out),
-        .player_x (player_x),
-        .player_y (player_y),
-        .is_wall  (is_wall),
-        .map_addr () /* Adres wystawiany jest w player_ctl */
-    );
-
-    draw_mouse u_draw_mouse (
-        .clk   (clk),
-        .rst   (rst_pclk),
-        .xpos  (mouse_x_sync2),
-        .ypos  (mouse_y_sync2),
-        .in    (render_to_mouse.in),
-        .out   (mouse_to_out.out)
-    );
+draw_mouse u_draw_mouse (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .out(mouse_to_out.out),
+    .in(render_to_mouse.in),
+    .xpos(mouse_x_sync2),
+    .ypos(mouse_y_sync2)
+);
 
 endmodule

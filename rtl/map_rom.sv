@@ -1,23 +1,29 @@
-`timescale 1 ns / 1 ps
+/**
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * ROM memory storing the wall layout for a 32x32 map.
+ * Initialized from an external .mem file.
+ */
 
-// Pamięć przechowująca układ ścian na naszej mapie 32x32
-module map_rom (
-    input  logic       clk,
-    input  logic [9:0] addr,     // 10-bitowy adres: [9:5] to Y kafelka, [4:0] to X kafelka
-    output logic       is_wall   // Wyjście: 1 = ściana, 0 = podłoga
+ module map_rom (
+    input  logic        clk,
+    input  logic [9:0]  addr_a,
+    output logic        is_wall_a,
+    input  logic [9:0]  addr_b,
+    output logic        is_wall_b
 );
 
-    // Deklaracja pamięci: 1024 elementy, każdy po 1 bit
-    logic [0:0] rom_memory [0:1023];
+logic rom_memory [1024];
 
-    // Wczytanie układu mapy
-    initial begin
-        $readmemb("map_walls.mem", rom_memory);
-    end
+initial begin
+    $readmemb("map_walls.mem", rom_memory);
+end
 
-    // Synchroniczny odczyt (wymagane by użyć bloków BRAM w Basys 3)
-    always_ff @(posedge clk) begin
-        is_wall <= rom_memory[addr];
-    end
+always_ff @(posedge clk) begin
+    is_wall_a <= rom_memory[addr_a];
+    is_wall_b <= rom_memory[addr_b];
+end
 
 endmodule

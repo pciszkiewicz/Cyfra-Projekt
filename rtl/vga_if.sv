@@ -1,17 +1,13 @@
 /**
- * Copyright (C) 2025  AGH University of Science and Technology
  * MTM UEC2
- * Author: Piotr Kaczmarczyk
+ * Author: Piotr Ciszkiewicz
  *
  * Description:
  * SystemVerilog interface for VGA signals pipeline.
  */
 
  interface vga_if;
-    timeunit 1ns;
-    timeprecision 1ps;
 
-    // Definicja wszystkich sygnałów (kabli) wewnątrz wiązki
     logic [10:0] vcount;
     logic        vsync;
     logic        vblnk;
@@ -20,14 +16,24 @@
     logic        hblnk;
     logic [11:0] rgb;
     
-    // Perspektywa wejściowa
     modport in (
-        input vcount, vsync, vblnk, hcount, hsync, hblnk, rgb
+        input vcount,
+        input vsync,
+        input vblnk,
+        input hcount,
+        input hsync,
+        input hblnk,
+        input rgb
     );
-
-    // Perspektywa wyjściowa
+    
     modport out (
-        output vcount, vsync, vblnk, hcount, hsync, hblnk, rgb
+        output vcount,
+        output vsync,
+        output vblnk,
+        output hcount,
+        output hsync,
+        output hblnk,
+        output rgb
     );
-
-endinterface
+    
+    endinterface
