@@ -12,58 +12,59 @@
 #-----------------------------------------------------#
 #                   Project details                   #
 #-----------------------------------------------------#
-# Project name                                  -- EDIT
-set project_name vga_project
+# Tytuł projektu zgodnie z listą kontrolną
+set project_name super_gra
 
-# Top module name                               -- EDIT
+# Nazwa głównego modułu syntezowalnego
 set top_module top_vga_basys3
 
-# FPGA device
+# Urządzenie docelowe: Basys 3
 set target xc7a35tcpg236-1
 
 #-----------------------------------------------------#
 #                    Design sources                   #
 #-----------------------------------------------------#
-# Specify .xdc files location                   -- EDIT
+
+# Pliki ograniczeń projektowych (.xdc)
 set xdc_files {
-    constraints/top_vga_basys3.xdc
-    constraints/clk_wiz_0.xdc 
+    ../constraints/top_vga_basys3.xdc
+    ../constraints/clk_wiz_0.xdc 
 }
 
-# Specify SystemVerilog design files location   -- EDIT
-# Specify SystemVerilog design files location   -- EDIT
-# Specify SystemVerilog design files location   -- EDIT
+# Pliki SystemVerilog - logika gry i potok VGA
+# vga_pkg.sv musi być pierwszy ze względu na importy!
 set sv_files {
-    ../rtl/vga_pkg.sv
-    ../rtl/vga_if.sv
-    ../rtl/vga_timing.sv
-    ../rtl/draw_bg.sv
-    ../rtl/draw_rect.sv
-    ../rtl/image_rom.sv
-    ../rtl/draw_rect_ctl.sv
-    ../rtl/draw_rect_char.sv
-    ../rtl/char_rom.sv
-    ../rtl/font_rom.sv
-    ../rtl/delay.sv
-    ../rtl/draw_mouse.sv
-    ../rtl/top_vga.sv
-    rtl/top_vga_basys3.sv
+    ../../rtl/vga_pkg.sv
+    ../../rtl/vga_if.sv
+    ../../rtl/vga_timing.sv
+    ../../rtl/crate_lut.sv
+    ../../rtl/crates_rom.sv
+    ../../rtl/map_rom.sv
+    ../../rtl/lfsr.sv
+    ../../rtl/draw_map.sv
+    ../../rtl/draw_mouse.sv
+    ../../rtl/player_ctl.sv
+    ../../rtl/game_fsm.sv
+    ../../rtl/game_logic_top.sv
+    ../../rtl/top_vga.sv
+    ../rtl/top_vga_basys3.sv
 }
 
-# Specify Verilog design files location         -- EDIT
+# Pliki Verilog - Generator zegara (IP Vivado)
 set verilog_files {
-    rtl/clk_wiz_0.v
-    rtl/clk_wiz_0_clk_wiz.v
+    ../rtl/clk_wiz_0.v
+    ../rtl/clk_wiz_0_clk_wiz.v
 }
 
-# Specify VHDL design files location            -- EDIT
+# Pliki VHDL - Kontrolery myszy i interfejs PS/2
 set vhdl_files {
-    ../rtl/MouseCtl.vhd
-    ../rtl/Ps2Interface.vhd
-    ../rtl/MouseDisplay.vhd
+    ../../rtl/MouseCtl.vhd
+    ../../rtl/Ps2Interface.vhd
+    ../../rtl/MouseDisplay.vhd
 }
 
-# Specify files for a memory initialization     -- EDIT
+# Pliki inicjalizacji pamięci ROM (układ mapy i skrzynek)
 set mem_files {
-    ../rtl/rect/image_rom.data
+    ../../rtl/crates_data.mem
+    ../../rtl/map_walls.mem
 }

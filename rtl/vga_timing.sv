@@ -1,36 +1,22 @@
 /**
- * Copyright (C) 2025  AGH University of Science and Technology
- * MTM UEC2
- * Author: Piotr Kaczmarczyk
- *
- * Description:
- * Vga timing controller using SystemVerilog interfaces.
+ * Author: Tomasz Jesionek
+ * Description: Vga timing controller with synchronous reset.
  */
-
- module vga_timing (
+module vga_timing (
     input  logic clk,
-    input  logic rst_n,
-    vga_if.out   out    
+    input  logic rst, // Reset synchroniczny
+    vga_if.out   out       
 );
 
-timeunit 1ns;
-timeprecision 1ps;
+    import vga_pkg::*;
 
-import vga_pkg::*;
-
-/**
- * Zmienne lokalne
- */
     logic [10:0] hcount_nxt;
     logic [10:0] vcount_nxt;
     logic hsync_nxt, vsync_nxt;
-    logic hblnk_nxt, vblnk_nxt;
+    logic hblnk_nxt, vblnk_nxt;a
 
-    /**
-     * Logika sekwencyjna
-     */
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always_ff @(posedge clk) begin
+        if (rst) begin
             out.vcount <= '0;
             out.vsync  <= '0;
             out.vblnk  <= '0;
@@ -45,22 +31,17 @@ import vga_pkg::*;
             out.hcount <= hcount_nxt;
             out.hsync  <= hsync_nxt;
             out.hblnk  <= hblnk_nxt;
-            out.rgb    <= 12'h0_0_0;  // Domyślny czarny kolor 
+            out.rgb    <= 12'h0_0_0;
         end
     end
 
-    /**
-     * Logika kombinacyjna
-     */
     always_comb begin
-        // 1. Licznik poziomy
         if (out.hcount == H_TOTAL - 1) begin
             hcount_nxt = '0;
         end else begin
             hcount_nxt = out.hcount + 1;
         end
 
-        // 2. Licznik pionowy
         if (out.hcount == H_TOTAL - 1) begin
             if (out.vcount == V_TOTAL - 1) begin
                 vcount_nxt = '0;
@@ -71,16 +52,13 @@ import vga_pkg::*;
             vcount_nxt = out.vcount;
         end
 
-        // 3. Sygnały synchronizacji
         hsync_nxt = (hcount_nxt >= HOR_PIXELS + H_FRONT_PORCH) && 
                     (hcount_nxt < HOR_PIXELS + H_FRONT_PORCH + H_SYNC_PULSE);
                     
         vsync_nxt = (vcount_nxt >= VER_PIXELS + V_FRONT_PORCH) && 
                     (vcount_nxt < VER_PIXELS + V_FRONT_PORCH + V_SYNC_PULSE);
 
-        // 4. Sygnały wygaszania blank 
         hblnk_nxt = (hcount_nxt >= HOR_PIXELS);
         vblnk_nxt = (vcount_nxt >= VER_PIXELS);
     end
-
 endmodule

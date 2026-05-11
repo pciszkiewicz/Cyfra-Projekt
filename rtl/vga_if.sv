@@ -19,7 +19,7 @@
     logic        hsync;
     logic        hblnk;
     logic [11:0] rgb;
-
+    
     // Perspektywa wejściowa
     modport in (
         input vcount, vsync, vblnk, hcount, hsync, hblnk, rgb
