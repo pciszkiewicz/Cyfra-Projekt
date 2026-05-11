@@ -55,6 +55,7 @@ logic        m_set_y;
 logic        m_set_y_nxt;
 
 logic [31:0] active_crates;
+logic [31:0] active_loot;
 logic [1:0]  current_state;
 logic [11:0] player_x;
 logic [11:0] player_y;
@@ -65,7 +66,8 @@ logic [9:0]  map_addr_player;
 logic        is_wall_player;
 
 vga_if timing_to_render();
-vga_if render_to_mouse();
+vga_if render_map_to_crates();    
+vga_if render_crates_to_mouse();  
 vga_if mouse_to_out();
 
 assign vs = mouse_to_out.vsync;
@@ -165,10 +167,12 @@ game_logic_top u_game_logic (
     .clk(clk),
     .rst_n(rst_pclk_n),
     .active_crates(active_crates),
+    .active_loot(active_loot),
     .current_state(current_state),
     .start_btn(mouse_left_sync2),
     .phase_timeout(1'b0),
-    .crates_hit_mask(32'h0)
+    .crates_hit_mask(32'h0),
+    .loot_collected_mask(32'h0)
 );
 
 player_ctl u_player_ctl (
@@ -187,10 +191,8 @@ player_ctl u_player_ctl (
 
 map_rom u_map_rom (
     .clk(clk),
-    // Port A (VGA Renderer)
     .addr_a(map_addr_vga),
     .is_wall_a(is_wall_vga),
-    // Port B (Player Physics)
     .addr_b(map_addr_player),
     .is_wall_b(is_wall_player)
 );
@@ -205,18 +207,29 @@ draw_map u_draw_map (
     .clk(clk),
     .rst_n(rst_pclk_n),
     .map_addr(map_addr_vga),
-    .out(render_to_mouse.out),
+    .out(render_map_to_crates.out),
     .in(timing_to_render.in),
     .player_x(player_x),
     .player_y(player_y),
     .is_wall(is_wall_vga)
 );
 
+draw_crates u_draw_crates (
+    .clk(clk),
+    .rst_n(rst_pclk_n),
+    .out(render_crates_to_mouse.out),
+    .in(render_map_to_crates.in),
+    .player_x(player_x),
+    .player_y(player_y),
+    .active_crates(active_crates),
+    .active_loot(active_loot)
+);
+
 draw_mouse u_draw_mouse (
     .clk(clk),
     .rst_n(rst_pclk_n),
     .out(mouse_to_out.out),
-    .in(render_to_mouse.in),
+    .in(render_crates_to_mouse.in),
     .xpos(mouse_x_sync2),
     .ypos(mouse_y_sync2)
 );

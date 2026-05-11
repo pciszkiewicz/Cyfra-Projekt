@@ -10,10 +10,12 @@
     input  logic        clk,
     input  logic        rst_n,
     output logic [31:0] active_crates,
+    output logic [31:0] active_loot,
     output logic [1:0]  current_state,
     input  logic        start_btn,
     input  logic        phase_timeout,
-    input  logic [31:0] crates_hit_mask
+    input  logic [31:0] crates_hit_mask,
+    input  logic [31:0] loot_collected_mask
 );
 
 logic [15:0] lfsr_out;
@@ -40,12 +42,14 @@ game_fsm u_game_fsm (
     .rst_n(rst_n),
     .rom_addr(rom_addr),
     .active_crates(active_crates),
+    .active_loot(active_loot),
     .current_state(current_state),
     .start_btn(start_btn),
     .phase_timeout(phase_timeout),
     .lfsr_val(lfsr_out[7:0]),
     .rom_data(rom_data_out),
-    .crates_hit_mask(crates_hit_mask)
+    .crates_hit_mask(crates_hit_mask),
+    .loot_collected_mask(loot_collected_mask)
 );
 
 endmodule

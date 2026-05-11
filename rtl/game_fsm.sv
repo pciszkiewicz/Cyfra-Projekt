@@ -6,17 +6,19 @@
  * Game state machine (FSM).
  */
 
- module game_fsm (
+module game_fsm (
     input  logic        clk,
     input  logic        rst_n,
     output logic [7:0]  rom_addr,
     output logic [31:0] active_crates,
+    output logic [31:0] active_loot,
     output logic [1:0]  current_state,
     input  logic        start_btn,
     input  logic        phase_timeout,
     input  logic [7:0]  lfsr_val,
     input  logic [31:0] rom_data,
-    input  logic [31:0] crates_hit_mask
+    input  logic [31:0] crates_hit_mask,
+    input  logic [31:0] loot_collected_mask
 );
 
 typedef enum logic [1:0] {
@@ -26,38 +28,54 @@ typedef enum logic [1:0] {
     ST_END     = 2'd3
 } state_t;
 
-state_t state, state_nxt;
-logic [31:0] active_crates_reg, active_crates_nxt;
+state_t state;
+state_t state_nxt;
+logic [31:0] active_crates_reg;
+logic [31:0] active_crates_nxt;
+logic [31:0] active_loot_reg;
+logic [31:0] active_loot_nxt;
+logic [31:0] newly_destroyed_crates;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         state             <= ST_INIT;
         active_crates_reg <= 32'h0;
+        active_loot_reg   <= 32'h0;
     end else begin
         state             <= state_nxt;
         active_crates_reg <= active_crates_nxt;
+        active_loot_reg   <= active_loot_nxt;
     end
 end
 
 always_comb begin
-    state_nxt         = state;
-    active_crates_nxt = active_crates_reg;
-    rom_addr          = lfsr_val; 
+    state_nxt              = state;
+    active_crates_nxt      = active_crates_reg;
+    active_loot_nxt        = active_loot_reg;
+    rom_addr               = lfsr_val; 
+    
+    // Wykrywanie, które skrzynki zostały zniszczone w tym takcie
+    newly_destroyed_crates = active_crates_reg & crates_hit_mask;
 
     case (state)
         ST_INIT: begin
             if (start_btn) begin
                 state_nxt         = ST_LOOTING;
                 active_crates_nxt = rom_data;
+                active_loot_nxt   = 32'h0;
             end
         end
         
         ST_LOOTING: begin
             active_crates_nxt = active_crates_reg & ~crates_hit_mask;
             
+            // Loot pojawia się zniszczonych skrzynkach i znika po zebraniu
+            active_loot_nxt   = (active_loot_reg | newly_destroyed_crates) & ~loot_collected_mask;
+            
             if (phase_timeout) begin
                 state_nxt         = ST_COMBAT;
                 active_crates_nxt = 32'h0;
+                active_loot_nxt   = 32'h0; // Czyszczenie mapy przed walką
             end
         end
         
@@ -78,5 +96,6 @@ end
 
 assign current_state = state;
 assign active_crates = active_crates_reg;
+assign active_loot   = active_loot_reg;
 
 endmodule
