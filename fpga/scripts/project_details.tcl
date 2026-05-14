@@ -41,6 +41,7 @@ set sv_files {
     ../../rtl/crates_rom.sv
     ../../rtl/map_rom.sv
     ../../rtl/lfsr.sv
+    ../../rtl/draw_start_screen.sv
     ../../rtl/draw_map.sv
     ../../rtl/draw_mouse.sv
     ../../rtl/player_ctl.sv
