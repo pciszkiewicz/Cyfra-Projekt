@@ -33,8 +33,8 @@ assign async_rst_n = ~(btnC || !locked);
 
 clk_wiz_0 u_clk_wiz (
     .clk(clk),
-    .clk100MHz(clk_100MHz),
-    .clk40MHz(pclk),
+    .clk100Mhz(clk_100MHz),
+    .clk65Mhz(pclk),
     .locked(locked)
 );
 

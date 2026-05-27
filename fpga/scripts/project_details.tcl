@@ -13,7 +13,7 @@
 #                   Project details                   #
 #-----------------------------------------------------#
 # Tytuł projektu zgodnie z listą kontrolną
-set project_name super_gra
+set project_name vga_project
 
 # Nazwa głównego modułu syntezowalnego
 set top_module top_vga_basys3
@@ -27,45 +27,46 @@ set target xc7a35tcpg236-1
 
 # Pliki ograniczeń projektowych (.xdc)
 set xdc_files {
-    ../constraints/top_vga_basys3.xdc
-    ../constraints/clk_wiz_0.xdc 
+    constraints/top_vga_basys3.xdc
+    constraints/clk_wiz_0.xdc
 }
 
 # Pliki SystemVerilog - logika gry i potok VGA
 # vga_pkg.sv musi być pierwszy ze względu na importy!
 set sv_files {
-    ../../rtl/vga_pkg.sv
-    ../../rtl/vga_if.sv
-    ../../rtl/vga_timing.sv
-    ../../rtl/crate_lut.sv
-    ../../rtl/crates_rom.sv
-    ../../rtl/map_rom.sv
-    ../../rtl/lfsr.sv
-    ../../rtl/draw_start_screen.sv
-    ../../rtl/draw_map.sv
-    ../../rtl/draw_mouse.sv
-    ../../rtl/player_ctl.sv
-    ../../rtl/game_fsm.sv
-    ../../rtl/game_logic_top.sv
-    ../../rtl/top_vga.sv
-    ../rtl/top_vga_basys3.sv
+    ../rtl/vga_pkg.sv
+    ../rtl/vga_if.sv
+    ../rtl/vga_timing.sv
+    ../rtl/crate_lut.sv
+    ../rtl/crates_rom.sv
+    ../rtl/map_rom.sv
+    ../rtl/lfsr.sv
+    ../rtl/draw_start_screen.sv
+    ../rtl/draw_map.sv
+    ../rtl/draw_crates.sv
+    ../rtl/draw_mouse.sv
+    ../rtl/player_ctl.sv
+    ../rtl/game_fsm.sv
+    ../rtl/game_logic_top.sv
+    ../rtl/top_vga.sv
+    rtl/top_vga_basys3.sv
 }
 
 # Pliki Verilog - Generator zegara (IP Vivado)
 set verilog_files {
-    ../rtl/clk_wiz_0.v
-    ../rtl/clk_wiz_0_clk_wiz.v
+    rtl/clk_wiz_0.v
+    rtl/clk_wiz_0_clk_wiz.v
 }
 
 # Pliki VHDL - Kontrolery myszy i interfejs PS/2
 set vhdl_files {
-    ../../rtl/MouseCtl.vhd
-    ../../rtl/Ps2Interface.vhd
-    ../../rtl/MouseDisplay.vhd
+    ../rtl/MouseCtl.vhd
+    ../rtl/Ps2Interface.vhd
+    ../rtl/MouseDisplay.vhd
 }
 
 # Pliki inicjalizacji pamięci ROM (układ mapy i skrzynek)
 set mem_files {
-    ../../rtl/crates_data.mem
-    ../../rtl/map_walls.mem
+    ../rtl/memory/crates_data.mem
+    ../rtl/memory/map_walls.mem
 }
