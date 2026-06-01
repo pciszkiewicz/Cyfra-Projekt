@@ -6,6 +6,8 @@
  * Top VGA structural module.
  */
 
+`timescale 1ns / 1ps
+
 module top_vga
     import vga_pkg::*;
     (
@@ -22,6 +24,20 @@ module top_vga
         inout  wire        ps2_data
     );
 
+    logic clk_65MHz;
+    logic clk_100MHz_internal;
+    logic clk_locked;
+    logic rst_sys_n;
+
+    assign rst_sys_n = rst_pclk_n & clk_locked;
+
+    clk_wiz_0 u_clk_wiz (
+        .clk(clk100MHz),
+        .clk100MHz(clk_100MHz_internal),
+        .clk65MHz(clk_65MHz),
+        .locked(clk_locked)
+    );
+    
     typedef enum logic [2:0] {
         ST_INIT_START = 3'd0,
         ST_SET_X      = 3'd1,
@@ -56,7 +72,7 @@ module top_vga
 
     logic [31:0] active_crates;
     logic [31:0] active_loot;
-    logic [1:0]  current_state;
+    logic [2:0]  current_state;
     logic [11:0] player_x;
     logic [11:0] player_y;
 
@@ -65,17 +81,23 @@ module top_vga
     logic [9:0]  map_addr_player;
     logic        is_wall_player;
 
-    vga_if timing_to_render();
+    logic [1:0]  class_id;
+    logic        char_select_btn;
+    logic [11:0] cam_x;
+    logic [11:0] cam_y;
+
+    vga_if timing_to_render_map();
     vga_if render_map_to_crates();
     vga_if render_crates_to_start();
-    vga_if render_start_to_mouse();
+    vga_if render_start_to_char();
+    vga_if char_to_mouse();
     vga_if mouse_to_out();
 
     assign vs = mouse_to_out.vsync;
     assign hs = mouse_to_out.hsync;
     assign {r, g, b} = mouse_to_out.rgb;
 
-    always_ff @(posedge clk or negedge rst_pclk_n) begin
+    always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
         if (!rst_pclk_n) begin
             mouse_x_sync1     <= 12'h0;
             mouse_x_sync2     <= 12'h0;
@@ -97,7 +119,7 @@ module top_vga
         end
     end
 
-    always_ff @(posedge clk100MHz or negedge rst_100m_n) begin
+    always_ff @(posedge clk100MHz_internal or negedge rst_100m_n) begin
         if (!rst_100m_n) begin
             m_state   <= ST_INIT_START;
             m_set_x   <= 1'b0;
@@ -171,6 +193,7 @@ module top_vga
         .active_loot(active_loot),
         .current_state(current_state),
         .start_btn(mouse_left_sync2),
+        .char_select_btn(char_select_btn),
         .phase_timeout(1'b0),
         .crates_hit_mask(32'h0),
         .loot_collected_mask(32'h0)
@@ -179,6 +202,7 @@ module top_vga
     player_ctl u_player_ctl (
         .clk(clk),
         .rst_n(rst_pclk_n),
+        .class_id(class_id),
         .map_addr(map_addr_player),
         .player_x(player_x),
         .player_y(player_y),
@@ -187,7 +211,9 @@ module top_vga
         .mouse_x(mouse_x_sync2[9:0]),
         .mouse_y(mouse_y_sync2[9:0]),
         .mouse_rmb(mouse_right_sync2),
-        .is_wall(is_wall_player)
+        .is_wall(is_wall_player),
+        .cam_x(cam_x),
+        .cam_y(cam_y),
     );
 
     map_rom u_map_rom (
@@ -207,6 +233,8 @@ module top_vga
     draw_map u_draw_map (
         .clk(clk),
         .rst_n(rst_pclk_n),
+        .cam_x(cam_X),
+        .cam_y(cam_y),
         .map_addr(map_addr_vga),
         .out(render_map_to_crates.out),
         .in(timing_to_render.in),
@@ -234,14 +262,27 @@ module top_vga
         .mouse_y(mouse_y_sync2),
         .mouse_left(mouse_left_sync2),
         .in(render_crates_to_start.in),
-        .out(render_start_to_mouse.out)
+        .out(render_start_to_char.out)
+    );
+
+    char_select u_char_select (
+        .clk(clk),
+        .rst_n(rst_pclk_n),
+        .current_state(current_state),
+        .mouse_x(mouse_x_sync2),
+        .mouse_y(mouse_y_sync2),
+        .mouse_left(mouse_left_sync2),
+        .in(render_start_to_char.in),
+        .out(char_to_mouse.out),
+        .class_id(class_id),
+        .char_select_btn(char_select_btn)
     );
 
     draw_mouse u_draw_mouse (
         .clk(clk),
         .rst_n(rst_pclk_n),
         .out(mouse_to_out.out),
-        .in(render_start_to_mouse.in),
+        .in(char_to_mouse.in),
         .xpos(mouse_x_sync2),
         .ypos(mouse_y_sync2)
     );
