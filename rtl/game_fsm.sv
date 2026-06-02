@@ -6,7 +6,7 @@
  * Game state machine (FSM).
  */
 
-module game_fsm (
+ module game_fsm (
     input  logic        clk,
     input  logic        rst_n,
     output logic [7:0]  rom_addr,
@@ -19,7 +19,9 @@ module game_fsm (
     input  logic [7:0]  lfsr_val,
     input  logic [31:0] rom_data,
     input  logic [31:0] crates_hit_mask,
-    input  logic [31:0] loot_collected_mask
+    input  logic [31:0] loot_collected_mask,
+    input  logic        p1_dead,
+    input  logic        p2_dead
 );
 
 typedef enum logic [2:0] {
@@ -32,10 +34,12 @@ typedef enum logic [2:0] {
 
 state_t state;
 state_t state_nxt;
+
 logic [31:0] active_crates_reg;
 logic [31:0] active_crates_nxt;
 logic [31:0] active_loot_reg;
 logic [31:0] active_loot_nxt;
+
 logic [31:0] newly_destroyed_crates;
 
 always_ff @(posedge clk or negedge rst_n) begin
@@ -54,7 +58,8 @@ always_comb begin
     state_nxt              = state;
     active_crates_nxt      = active_crates_reg;
     active_loot_nxt        = active_loot_reg;
-    rom_addr               = lfsr_val; 
+
+    rom_addr               = lfsr_val;
     
     // Wykrywanie, które skrzynki zostały zniszczone w tym takcie
     newly_destroyed_crates = active_crates_reg & crates_hit_mask;
@@ -69,15 +74,17 @@ always_comb begin
         ST_CHAR_SELECT: begin
             if(char_select_btn) begin
                 state_nxt = ST_LOOTING;
+                // Inicjalizacja skrzynek na mapie po wyborze postaci
                 active_crates_nxt = rom_data;
                 active_loot_nxt   = 32'h0;
             end
         end
         
         ST_LOOTING: begin
+            // Usunięcie zniszczonych skrzynek
             active_crates_nxt = active_crates_reg & ~crates_hit_mask;
             
-            // Loot pojawia się zniszczonych skrzynkach i znika po zebraniu
+            // Loot pojawia się w zniszczonych skrzynkach i znika po zebraniu
             active_loot_nxt = (active_loot_reg | newly_destroyed_crates) & ~loot_collected_mask;
             
             if (phase_timeout) begin
@@ -88,6 +95,10 @@ always_comb begin
         end
         
         ST_COMBAT: begin
+            // Warunek wyjścia z fazy walki - śmierć któregokolwiek gracza
+            if (p1_dead || p2_dead) begin
+                state_nxt = ST_END;
+            end
         end
         
         ST_END: begin

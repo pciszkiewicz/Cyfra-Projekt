@@ -1,101 +1,121 @@
-/**
- * MTM UEC2
- * Author: Piotr Ciszkiewicz
- *
- * Description:
- * Player control module handling movement and collision detection.
- */
+`timescale 1 ns / 1 ps
 
-module player_ctl (
+module player_ctl #(
+    parameter int MAP_WIDTH_M = 4096,  
+    parameter int MAP_HEIGHT_N = 4096, 
+    parameter int SCREEN_W = 1024,
+    parameter int SCREEN_H = 768,
+    parameter int PLAYER_SIZE = 32
+)(
     input  logic        clk,
     input  logic        rst_n,
-    output logic [9:0]  map_addr,
-    output logic [11:0] player_x,
-    output logic [11:0] player_y,
-    output logic [11:0] cam_x,
-    output logic [11:0] cam_y,
-    input  logic [10:0] vcount,
-    input  logic [10:0] hcount,
-    input  logic [9:0]  mouse_x,
-    input  logic [9:0]  mouse_y,
-    input  logic        mouse_rmb,
-    input  logic        is_wall
+    
+    // Interfejs myszy (koordynaty ekranowe)
+    input  logic [11:0] mouse_x,        // 0-1023
+    input  logic [11:0] mouse_y,        // 0-767
+    input  logic        mouse_rmb,      // PPM wyznacza wektor ruchu
+    
+    // Interfejs z maszyną stanów
+    input  logic [1:0]  char_class,     // 4 klasy (00, 01, 10, 11)
+    input  logic        load_stats,     // Sygnał przejścia ze ST_CHAR_SELECT
+    input  logic        take_damage,    // Sygnał kolizji pocisku z graczem
+    
+    // Wyjścia (stan globalny gracza)
+    output logic [15:0] world_x,
+    output logic [15:0] world_y,
+    output logic [7:0]  hp,
+    output logic        is_dead
 );
 
-localparam logic [11:0] CENTER_X = 10'd512;
-localparam logic [11:0] CENTER_Y = 10'd384;
-localparam logic [11:0] MAP_LIMIT_X = 12'd1536;
-localparam logic [11:0] MAP_LIMIT_Y = 12'd1664;
-localparam logic [11:0] MAX_CAM_X   = 12'd1024;
-localparam logic [11:0] MAX_CAM_Y   = 12'd1280;
-
-logic [11:0] speed;
-logic [11:0] px_reg, px_nxt, py_reg, py_nxt;
-logic [11:0] target_x_reg, target_x_nxt;
-logic [11:0] target_y_reg, target_y_nxt;
-logic        frame_tick;
-
-assign frame_tick = (vcount == 11'd0 && hcount == 11'd0);
-
-always_comb begin
-    case(class_id)
-        2'd0: speed = 12'd2;
-        2'd1: speed = 12'd4;
-        2'd2: speed = 12'd6;
-        2'd3: speed = 12'd3;
-        default: speed = 12'd4;
-    endcase
-end
-
-always_comb begin
-    cam_x = (px_reg < CENTER_X) ? 12'd0 : ((px_reg > MAP_LIMIT_X) ? MAX_CAM_X : (px_reg - CENTER_X));
-    cam_y = (px_reg < CENTER_Y) ? 12'd0 : ((px_reg > MAP_LIMIT_Y) ? MAX_CAM_Y : (px_reg - CENTER_Y));
-end
-
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        px_reg <= 12'd160;
-        py_reg <= 12'd992;
-        target_x_reg <= 12'd160;
-        target_y_reg <= 12'd992;
-    end else begin
-        px_reg <= px_nxt;
-        py_reg <= py_nxt;
-        target_x_reg <= target_x_nxt;
-        target_y_reg <= target_y_nxt;
-    end
-end
-
-always_comb begin
-    px_nxt = px_reg;
-    py_nxt = py_reg;
-    target_x_nxt = target_x_reg;
-    target_y_nxt = target_y_reg;
+    // --- Rejestry obecnego i następnego stanu ---
+    logic [15:0] world_x_reg, world_x_nxt;
+    logic [15:0] world_y_reg, world_y_nxt;
+    logic [7:0]  hp_reg, hp_nxt;
+    logic [3:0]  speed_reg, speed_nxt;
     
-    // map_addr wystawiony teraz, is_wall przyjdzie w następnym takcie
-    map_addr = {py_reg[10:6], px_reg[10:6]}; 
+    // Gracz jest zawsze na środku, więc ruch odbywa się względem tego punktu
+    localparam int CENTER_X = SCREEN_W / 2;
+    localparam int CENTER_Y = SCREEN_H / 2;
+    
+    // Strefa martwa (deadzone), żeby postać nie drgała, 
+    // gdy kursor jest tuż nad nią.
+    localparam int DEADZONE = 20; 
+    localparam int CENTER_X_L = CENTER_X - DEADZONE;
+    localparam int CENTER_X_R = CENTER_X + DEADZONE;
+    localparam int CENTER_Y_U = CENTER_Y - DEADZONE;
+    localparam int CENTER_Y_D = CENTER_Y + DEADZONE;
 
-    if (mouse_rmb) begin
-            target_x_nxt = {2'b00, mouse_x} + cam_x;
-            target_y_nxt = {2'b00, mouse_y} + cam_y;
-        end
-
-        if (frame_tick && !is_wall) begin
-            if (target_x_reg > px_reg + speed)      px_nxt = px_reg + speed;
-            else if (target_x_reg < px_reg - speed) px_nxt = px_reg - speed;
-            else                                    px_nxt = target_x_reg;
-
-            if (target_y_reg > py_reg + speed)      py_nxt = py_reg + speed;
-            else if (target_y_reg < py_reg - speed) py_nxt = py_reg - speed;
-            else                                    py_nxt = target_y_reg;
-        end else if (is_wall) begin
-            target_x_nxt = px_reg;
-            target_y_nxt = py_reg;
+    // 1. BLOK SEKWENCYJNY (Aktualizacja stanu z resetem asynchronicznym)
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            world_x_reg <= MAP_WIDTH_M / 2; // Zaczynamy na środku mapy
+            world_y_reg <= MAP_HEIGHT_N / 2;
+            hp_reg      <= 8'd100;
+            speed_reg   <= 4'd4;
+        end else begin
+            world_x_reg <= world_x_nxt;
+            world_y_reg <= world_y_nxt;
+            hp_reg      <= hp_nxt;
+            speed_reg   <= speed_nxt;
         end
     end
 
-assign map_addr = {py_reg[10:6], px_reg[10:6]};
-assign player_x = px_reg;
-assign player_y = py_reg;
+    // 2. BLOK KOMBINACYJNY (Logika ruchu i interakcji)
+    always_comb begin
+        // Domyślne przypisania (aby uniknąć inferred latches)
+        world_x_nxt = world_x_reg;
+        world_y_nxt = world_y_reg;
+        hp_nxt      = hp_reg;
+        speed_nxt   = speed_reg;
+        
+        // A. Ładowanie klas postaci podczas inicjalizacji/respawnu
+        if (load_stats) begin
+            case (char_class)
+                2'b00: begin hp_nxt = 8'd100; speed_nxt = 4'd4; end // Balans
+                2'b01: begin hp_nxt = 8'd200; speed_nxt = 4'd2; end // Tank
+                2'b10: begin hp_nxt = 8'd75;  speed_nxt = 4'd6; end // Scout
+                2'b11: begin hp_nxt = 8'd50;  speed_nxt = 4'd5; end // Glass Cannon
+            endcase
+            world_x_nxt = MAP_WIDTH_M / 2; 
+            world_y_nxt = MAP_HEIGHT_N / 2;
+        end
+        
+        // B. Obliczanie wektora ruchu (PPM wyznacza kierunek względem środka ekranu)
+        else if (hp_reg > 0 && mouse_rmb) begin
+            
+            // Logika dla osi X z blokadą wyjścia poza obszar M
+            if (mouse_x < CENTER_X_L) begin
+                if (world_x_reg > speed_reg)
+                    world_x_nxt = world_x_reg - speed_reg;
+            end else if (mouse_x > CENTER_X_R) begin
+                if (world_x_reg < MAP_WIDTH_M - PLAYER_SIZE)
+                    world_x_nxt = world_x_reg + speed_reg;
+            end
+            
+            // Logika dla osi Y z blokadą wyjścia poza obszar N
+            if (mouse_y < CENTER_Y_U) begin
+                if (world_y_reg > speed_reg)
+                    world_y_nxt = world_y_reg - speed_reg;
+            end else if (mouse_y > CENTER_Y_D) begin
+                if (world_y_reg < MAP_HEIGHT_N - PLAYER_SIZE)
+                    world_y_nxt = world_y_reg + speed_reg;
+            end
+        end
+        
+        // C. Logika otrzymywania obrażeń (tylko w trakcie gry)
+        if (take_damage && hp_reg > 0 && !load_stats) begin
+            // UWAGA: Tu w przyszłości można dodać blokadę otrzymywania 
+            // obrażeń co każdy cykl zegara (np. mały timer "invulnerability").
+            // Na ten moment zakładamy prosty spadek HP per "hit".
+            if (hp_reg >= 8'd10) hp_nxt = hp_reg - 8'd10;
+            else                 hp_nxt = 8'd0;
+        end
+    end
+    
+    // 3. PRZYPISANIA WYJŚĆ
+    assign world_x = world_x_reg;
+    assign world_y = world_y_reg;
+    assign hp      = hp_reg;
+    assign is_dead = (hp_reg == 8'd0);
 
 endmodule
