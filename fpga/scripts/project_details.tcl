@@ -1,6 +1,7 @@
 # Copyright (C) 2025  AGH University of Science and Technology
 # MTM UEC2
 # Author: Piotr Kaczmarczyk
+# Modified: Piotr Ciszkiewicz
 #
 # Description:
 # Project detiles required for generate_bitstream.tcl
@@ -37,14 +38,23 @@ set sv_files {
     ../rtl/vga_pkg.sv
     ../rtl/vga_if.sv
     ../rtl/vga_timing.sv
+    ../rtl/edge_detector.sv
     ../rtl/crate_lut.sv
     ../rtl/crates_rom.sv
     ../rtl/map_rom.sv
     ../rtl/lfsr.sv
+    ../rtl/cam_translation.sv
+    ../rtl/bullet_ctl.sv
+    ../rtl/collision_det.sv
+    ../rtl/uart_tx.sv
+    ../rtl/uart_rx.sv
+    ../rtl/uart_packet_ctl.sv
     ../rtl/draw_start_screen.sv
     ../rtl/draw_char_select.sv
     ../rtl/draw_map.sv
     ../rtl/draw_crates.sv
+    ../rtl/draw_entities.sv
+    ../rtl/draw_hud.sv
     ../rtl/draw_mouse.sv
     ../rtl/player_ctl.sv
     ../rtl/game_fsm.sv
