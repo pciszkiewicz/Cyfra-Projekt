@@ -16,7 +16,7 @@
 );
 
 // Zmiana rozmiaru tablicy z 1024 na 4096 (64 kafelki * 64 kafelki)
-logic rom_memory [4096];
+(* rom_style = "block" *) logic [0:0] rom_memory [4096:0];
 
 initial begin
     $readmemb("map_walls.mem", rom_memory);

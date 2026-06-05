@@ -24,6 +24,7 @@ module player_ctl #(
     output logic [15:0] world_x,
     output logic [15:0] world_y,
     output logic [7:0]  hp,
+    output logic [7:0]  dmg,
     output logic        is_dead
 );
 
@@ -32,6 +33,7 @@ module player_ctl #(
     logic [15:0] world_y_reg, world_y_nxt;
     logic [7:0]  hp_reg, hp_nxt;
     logic [3:0]  speed_reg, speed_nxt;
+    logic [7:0]  dmg_reg, dmg_nxt;
     
     // Gracz jest zawsze na środku, więc ruch odbywa się względem tego punktu
     localparam int CENTER_X = SCREEN_W / 2;
@@ -52,11 +54,13 @@ module player_ctl #(
             world_y_reg <= MAP_HEIGHT_N / 2;
             hp_reg      <= 8'd100;
             speed_reg   <= 4'd4;
+            dmg_reg     <= 8'd25;
         end else begin
             world_x_reg <= world_x_nxt;
             world_y_reg <= world_y_nxt;
             hp_reg      <= hp_nxt;
             speed_reg   <= speed_nxt;
+            dmg_reg     <= dmg_nxt;
         end
     end
 
@@ -67,14 +71,15 @@ module player_ctl #(
         world_y_nxt = world_y_reg;
         hp_nxt      = hp_reg;
         speed_nxt   = speed_reg;
+        dmg_nxt     = dmg_reg;
         
         // A. Ładowanie klas postaci podczas inicjalizacji/respawnu
         if (load_stats) begin
             case (char_class)
-                2'b00: begin hp_nxt = 8'd100; speed_nxt = 4'd4; end // Balans
-                2'b01: begin hp_nxt = 8'd200; speed_nxt = 4'd2; end // Tank
-                2'b10: begin hp_nxt = 8'd75;  speed_nxt = 4'd6; end // Scout
-                2'b11: begin hp_nxt = 8'd50;  speed_nxt = 4'd5; end // Glass Cannon
+                2'b00: begin hp_nxt = 8'd100; speed_nxt = 4'd4; dmg_nxt = 8'd20; end // Balans
+                2'b01: begin hp_nxt = 8'd200; speed_nxt = 4'd2; dmg_nxt = 8'd15; end // Tank
+                2'b10: begin hp_nxt = 8'd75;  speed_nxt = 4'd6; dmg_nxt = 8'd15; end // Scout
+                2'b11: begin hp_nxt = 8'd50;  speed_nxt = 4'd5; dmg_nxt = 8'd30; end // Glass Cannon
             endcase
             world_x_nxt = MAP_WIDTH_M / 2; 
             world_y_nxt = MAP_HEIGHT_N / 2;
@@ -116,6 +121,7 @@ module player_ctl #(
     assign world_x = world_x_reg;
     assign world_y = world_y_reg;
     assign hp      = hp_reg;
+    assign dmg     = dmg_reg;
     assign is_dead = (hp_reg == 8'd0);
 
 endmodule

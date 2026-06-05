@@ -297,3 +297,5 @@ set_property PACKAGE_PIN B17 [get_ports PS2Data]
 ## Configuration options, can be used for all designs
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property CFGBVS VCCO [current_design]
+
+set_max_delay -datapath_only -from [all_registers] -to [get_cells -hierarchical -filter {NAME =~ *mouse_*_sync1_reg*}] 15.0

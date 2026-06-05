@@ -6,7 +6,7 @@
  * Crate and loot rendering module inserted into the VGA pipeline.
  */
 
- module draw_crates (
+module draw_crates (
     input  logic        clk,
     input  logic        rst_n,
     vga_if.out          out,
@@ -17,13 +17,8 @@
     input  logic [31:0] active_loot
 );
 
-logic signed [12:0] map_pixel_x;
-logic signed [12:0] map_pixel_y;
-logic [11:0]        crate_x [32];
-logic [11:0]        crate_y [32];
-logic               is_crate;
-logic               is_loot;
-logic [11:0]        rgb_nxt;
+logic [11:0] crate_x [32];
+logic [11:0] crate_y [32];
 
 genvar i;
 generate
@@ -36,60 +31,74 @@ generate
     end
 endgenerate
 
+logic signed [12:0] map_pixel_x, map_pixel_y;
+
 always_comb begin
     map_pixel_x = $signed({2'b0, in.hcount}) + $signed({1'b0, player_x}) - 13'sd512;
     map_pixel_y = $signed({2'b0, in.vcount}) + $signed({1'b0, player_y}) - 13'sd384;
+end
 
+logic signed [12:0] map_pixel_x_d1, map_pixel_y_d1;
+logic [10:0]        hcount_d1, vcount_d1;
+logic               hsync_d1, vsync_d1, hblnk_d1, vblnk_d1;
+logic [11:0]        rgb_d1;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        map_pixel_x_d1 <= '0; map_pixel_y_d1 <= '0;
+        hcount_d1      <= '0; vcount_d1      <= '0;
+        hsync_d1       <= '0; vsync_d1       <= '0;
+        hblnk_d1       <= '0; vblnk_d1       <= '0;
+        rgb_d1         <= '0;
+    end else begin
+        map_pixel_x_d1 <= map_pixel_x; map_pixel_y_d1 <= map_pixel_y;
+        hcount_d1      <= in.hcount;   vcount_d1      <= in.vcount;
+        hsync_d1       <= in.hsync;    vsync_d1       <= in.vsync;
+        hblnk_d1       <= in.hblnk;    vblnk_d1       <= in.vblnk;
+        rgb_d1         <= in.rgb;
+    end
+end
+
+logic is_crate, is_loot;
+logic [11:0] rgb_nxt;
+logic signed [12:0] dx, dy;
+
+always_comb begin
     is_crate = 1'b0;
     is_loot  = 1'b0;
     
     for (int j = 0; j < 32; j = j + 1) begin
-        if (map_pixel_x >= $signed({1'b0, crate_x[j]}) &&
-            map_pixel_x < $signed({1'b0, crate_x[j]} + 13'sd32) &&
-            map_pixel_y >= $signed({1'b0, crate_y[j]}) &&
-            map_pixel_y < $signed({1'b0, crate_y[j]} + 13'sd32)) begin
-            
+        dx = map_pixel_x_d1 - $signed({1'b0, crate_x[j]});
+        dy = map_pixel_y_d1 - $signed({1'b0, crate_y[j]});
+        
+        if (dx[12:5] == 8'b0 && dy[12:5] == 8'b0) begin
             if (active_crates[j]) begin
                 is_crate = 1'b1;
             end else if (active_loot[j]) begin
-                if (map_pixel_x >= $signed({1'b0, crate_x[j]} + 13'sd8) &&
-                    map_pixel_x < $signed({1'b0, crate_x[j]} + 13'sd24) &&
-                    map_pixel_y >= $signed({1'b0, crate_y[j]} + 13'sd8) &&
-                    map_pixel_y < $signed({1'b0, crate_y[j]} + 13'sd24)) begin
+                if (dx >= 13'sd8 && dx < 13'sd24 && dy >= 13'sd8 && dy < 13'sd24) begin
                     is_loot = 1'b1;
                 end
             end
         end
     end
-end
 
-always_comb begin
-    rgb_nxt = in.rgb;
-    if (!in.vblnk && !in.hblnk) begin
-        if (is_crate) begin
-            rgb_nxt = 12'h840; 
-        end else if (is_loot) begin
-            rgb_nxt = 12'hFD0; 
-        end
+    rgb_nxt = rgb_d1;
+    if (!vblnk_d1 && !hblnk_d1) begin
+        if (is_crate)      rgb_nxt = 12'h840; 
+        else if (is_loot)  rgb_nxt = 12'hFD0; 
     end
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        out.vcount <= '0;
-        out.hcount <= '0;
-        out.vsync  <= '0;
-        out.hsync  <= '0;
-        out.vblnk  <= '0;
-        out.hblnk  <= '0;
+        out.vcount <= '0; out.hcount <= '0;
+        out.vsync  <= '0; out.hsync  <= '0;
+        out.vblnk  <= '0; out.hblnk  <= '0;
         out.rgb    <= '0;
     end else begin
-        out.vcount <= in.vcount;
-        out.hcount <= in.hcount;
-        out.vsync  <= in.vsync;
-        out.hsync  <= in.hsync;
-        out.vblnk  <= in.vblnk;
-        out.hblnk  <= in.hblnk;
+        out.vcount <= vcount_d1; out.hcount <= hcount_d1;
+        out.vsync  <= vsync_d1;  out.hsync  <= hsync_d1;
+        out.vblnk  <= vblnk_d1;  out.hblnk  <= hblnk_d1;
         out.rgb    <= rgb_nxt;
     end
 end

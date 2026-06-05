@@ -3,7 +3,7 @@
 module draw_start_screen (
     input  logic       clk,
     input  logic       rst_n,
-    input  logic [1:0] current_state,
+    input  logic [2:0] current_state,
     input  logic [11:0] mouse_x,
     input  logic [11:0] mouse_y,
     input  logic        mouse_left,

@@ -61,12 +61,17 @@
      // =========================================================================
      logic [11:0] mouse_x_raw, mouse_y_raw;
      logic        mouse_right_raw, mouse_left_raw;
- 
+
+     (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_x_sync1, mouse_x_sync2;
+     (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_y_sync1, mouse_y_sync2;
+     (* ASYNC_REG = "TRUE" *) logic        mouse_right_sync1, mouse_right_sync2;
+     (* ASYNC_REG = "TRUE" *) logic        mouse_left_sync1, mouse_left_sync2;
+ /*
      logic [11:0] mouse_x_sync1, mouse_x_sync2;
      logic [11:0] mouse_y_sync1, mouse_y_sync2;
      logic        mouse_right_sync1, mouse_right_sync2;
      logic        mouse_left_sync1, mouse_left_sync2;
- 
+ */
      // Podwójne rejestry (zapobieganie metastabilności)
      always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
          if (!rst_sys_n) begin
@@ -189,6 +194,7 @@
      
      logic [15:0] my_world_x, my_world_y;
      logic [7:0]  my_hp;
+     logic [7:0]  my_dmg;
      logic        my_dead;
      logic [1:0]  class_id;
      logic        char_select_btn;
@@ -232,6 +238,7 @@
          .world_x(my_world_x),
          .world_y(my_world_y),
          .hp(my_hp),
+         .dmg(my_dmg),
          .is_dead(my_dead)
      );
  
