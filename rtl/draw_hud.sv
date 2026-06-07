@@ -27,7 +27,8 @@ module draw_hud (
     
     // Klasa "Tank" ma 200 HP. Mnożymy HP x2, by pasek miał max 400 pikseli szerokości
     localparam int MAX_BAR_W   = 400;   
-    
+    localparam int BORDER_W  = 2;
+
     logic [10:0] my_bar_w;
     logic [10:0] enemy_bar_w;
     logic [11:0] rgb_nxt;
@@ -66,37 +67,32 @@ module draw_hud (
     // 2. BLOK KOMBINACYJNY (Logika nakładania pikseli interfejsu)
     // =========================================================================
     always_comb begin
-        // Domyślnie przepuszczamy grafikę (mapę/skrzynki) z poprzedniego modułu
         rgb_nxt = in.rgb; 
         
         if (!in.vblnk && !in.hblnk) begin
             
-            // Ograniczamy działanie tylko do strefy wertykalnej obu pasków
-            if (in.vcount >= BAR_Y_START && in.vcount <= BAR_Y_END) begin
+            if (in.vcount >= BAR_Y_START - BORDER_W && in.vcount <= BAR_Y_END + BORDER_W &&
+                in.hcount >= P1_X_START - BORDER_W && in.hcount <= P1_X_START + MAX_BAR_W + BORDER_W) begin
                 
-                // ----------------------------------------------------
-                // PASEK 1: Mój HP (Rysowany od lewej do prawej)
-                // ----------------------------------------------------
-                if (in.hcount >= P1_X_START && in.hcount < (P1_X_START + my_bar_w)) begin
-                    rgb_nxt = 12'h0F0; // Czysty zielony (aktualne zdrowie)
+                if (in.vcount >= BAR_Y_START && in.vcount <= BAR_Y_END && in.hcount >= P1_X_START && in.hcount < P1_X_START + MAX_BAR_W) begin
+                    if (in.hcount < P1_X_START + my_bar_w) rgb_nxt = 12'h0F0; 
+                    else                                   rgb_nxt = 12'h444; 
+                end else begin
+                    rgb_nxt = 12'hFFF; 
                 end
-                // Rysowanie tła (szare miejsce po straconym HP)
-                else if (in.hcount >= P1_X_START && in.hcount < (P1_X_START + MAX_BAR_W)) begin
-                    rgb_nxt = 12'h444; // Ciemnoszary
-                end
-                
-                // ----------------------------------------------------
-                // PASEK 2: Enemy HP (Rysowany od prawej do lewej)
-                // ----------------------------------------------------
-                if (in.hcount <= P2_X_END && in.hcount > (P2_X_END - enemy_bar_w)) begin
-                    rgb_nxt = 12'hF00; // Czysty czerwony
-                end
-                else if (in.hcount <= P2_X_END && in.hcount > (P2_X_END - MAX_BAR_W)) begin
-                    rgb_nxt = 12'h444; 
-                end
-                
             end
+            
+            else if (in.vcount >= BAR_Y_START - BORDER_W && in.vcount <= BAR_Y_END + BORDER_W &&
+                     in.hcount >= P2_X_END - MAX_BAR_W - BORDER_W && in.hcount <= P2_X_END + BORDER_W) begin
+                
+                if (in.vcount >= BAR_Y_START && in.vcount <= BAR_Y_END && in.hcount > P2_X_END - MAX_BAR_W && in.hcount <= P2_X_END) begin
+                    if (in.hcount > P2_X_END - enemy_bar_w) rgb_nxt = 12'hF00; 
+                    else                                    rgb_nxt = 12'h444; 
+                end else begin
+                    rgb_nxt = 12'hFFF; 
+                end
+            end
+            
         end
     end
-
 endmodule

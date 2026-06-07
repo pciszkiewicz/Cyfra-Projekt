@@ -204,6 +204,9 @@
      
      logic [15:0] my_bullet_x, my_bullet_y;
      logic        my_bullet_active;
+     logic [7:0]  my_bullet_dmg;
+     logic        rx_take_dmg_en;
+     logic [7:0]  rx_take_dmg_val;
      logic        hit_enemy, hit_wall;
      
      logic [11:0] map_addr_vga;
@@ -234,7 +237,8 @@
          .mouse_rmb(mouse_right_sync2), 
          .char_class(class_id),
          .load_stats(char_select_btn), 
-         .take_damage(1'b0), // Odbiór obrażeń z UART do dodania 
+         .take_dmg_en(rx_take_dmg_en),
+         .take_dmg_val(rx_take_dmg_val), 
          .world_x(my_world_x),
          .world_y(my_world_y),
          .hp(my_hp),
@@ -251,12 +255,14 @@
          .mouse_lmb(mouse_lmb_pulse), 
          .player_world_x(my_world_x),
          .player_world_y(my_world_y),
+         .player_dmg(my_dmg),
          .hit_wall(hit_wall),
          .hit_enemy(hit_enemy),
          .phase_combat(current_state == 3'd3), 
          .bullet_world_x(my_bullet_x),
          .bullet_world_y(my_bullet_y),
-         .bullet_active(my_bullet_active)
+         .bullet_active(my_bullet_active),
+         .bullet_dmg(my_bullet_dmg)
      );
  
      collision_det u_collision_det (
@@ -303,9 +309,13 @@
          .my_x(my_world_x),
          .my_y(my_world_y),
          .my_hp(my_hp),
+         .hit_enemy(hit_enemy),
+         .my_bullet_dmg(my_bullet_dmg),
          .enemy_x(enemy_world_x),
          .enemy_y(enemy_world_y),
          .enemy_hp(enemy_hp),
+         .take_dmg_en(rx_take_dmg_en),
+         .take_dmg_val(rx_take_dmg_val),
          .tx_start(tx_start),
          .tx_data(tx_data),
          .tx_busy(tx_busy),
@@ -393,7 +403,7 @@
          .current_state(current_state),
          .mouse_x(mouse_x_sync2),
          .mouse_y(mouse_y_sync2),
-         .mouse_left(mouse_lmb_pulse),
+         .mouse_left(mouse_left_sync2),
          .in(start_to_char.in),
          .out(char_to_mouse.out),
          .class_id(class_id),

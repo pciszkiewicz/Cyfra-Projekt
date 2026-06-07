@@ -6,34 +6,39 @@
  * Moduł rysujący obiekty dynamiczne (przeciwnika i pociski) na podstawie
  * ich globalnych współrzędnych przetłumaczonych na ekran kamery.
  */
+
+ `timescale 1 ns / 1 ps
+
 module draw_entities #(
     parameter int PLAYER_SIZE = 32,
-    parameter int BULLET_SIZE = 4
+    parameter int BULLET_SIZE = 4,
+    parameter int SCREEN_W    = 1024,
+    parameter int SCREEN_H    = 768
 )(
     input  logic        clk,
     input  logic        rst_n,
 
-    // Interfejsy VGA
     vga_if.in           in,
     vga_if.out          out,
 
-    // Pozycja naszej kamery (środek ekranu)
     input  logic [15:0] cam_world_x,
     input  logic [15:0] cam_world_y,
 
-    // Dane przeciwnika
     input  logic [15:0] enemy_world_x,
     input  logic [15:0] enemy_world_y,
     input  logic [7:0]  enemy_hp,
 
-    // Dane naszego pocisku
     input  logic [15:0] bullet_world_x,
     input  logic [15:0] bullet_world_y,
     input  logic        bullet_active
 );
 
+    // Stała pozycja lokalnego gracza na ekranie (zawsze na środku)
+    localparam int P1_SCREEN_X = (SCREEN_W / 2) - (PLAYER_SIZE / 2);
+    localparam int P1_SCREEN_Y = (SCREEN_H / 2) - (PLAYER_SIZE / 2);
+
     // =========================================================================
-    // 1. TRANSLACJA WSPÓŁRZĘDNYCH (Instancje modułu kamery)
+    // 1. TRANSLACJA WSPÓŁRZĘDNYCH
     // =========================================================================
     logic [11:0] enemy_screen_x, enemy_screen_y;
     logic        enemy_visible;
@@ -66,51 +71,58 @@ module draw_entities #(
     );
 
     // =========================================================================
-    // 2. BLOK SEKWENCYJNY (Synchronizacja sygnałów VGA z resetem asynchronicznym)
+    // 2. BLOK SEKWENCYJNY (Pipeline)
     // =========================================================================
     logic [11:0] rgb_nxt;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            out.vcount <= '0;
-            out.hcount <= '0;
-            out.vsync  <= '0;
-            out.hsync  <= '0;
-            out.vblnk  <= '0;
-            out.hblnk  <= '0;
+            out.vcount <= '0; out.hcount <= '0;
+            out.vsync  <= '0; out.hsync  <= '0;
+            out.vblnk  <= '0; out.hblnk  <= '0;
             out.rgb    <= 12'h000;
         end else begin
-            out.vcount <= in.vcount;
-            out.hcount <= in.hcount;
-            out.vsync  <= in.vsync;
-            out.hsync  <= in.hsync;
-            out.vblnk  <= in.vblnk;
-            out.hblnk  <= in.hblnk;
+            out.vcount <= in.vcount; out.hcount <= in.hcount;
+            out.vsync  <= in.vsync;  out.hsync  <= in.hsync;
+            out.vblnk  <= in.vblnk;  out.hblnk  <= in.hblnk;
             out.rgb    <= rgb_nxt;
         end
     end
 
     // =========================================================================
-    // 3. BLOK KOMBINACYJNY (Nakładanie pikseli obiektów na obraz)
+    // 3. BLOK KOMBINACYJNY (Nakładanie pikseli)
     // =========================================================================
     always_comb begin
-        // Domyślnie przepuszczamy to, co narysowały wcześniejsze moduły (np. mapa)
         rgb_nxt = in.rgb;
 
         if (!in.vblnk && !in.hblnk) begin
             
-            // A. Rysowanie przeciwnika (Tylko jeśli żyje i mieści się w kamerze)
-            if (enemy_hp > 0 && enemy_visible) begin
+            // A. Rysowanie LOKALNEGO GRACZA (zawsze na środku ekranu)
+            if (in.hcount >= P1_SCREEN_X && in.hcount < (P1_SCREEN_X + PLAYER_SIZE) &&
+                in.vcount >= P1_SCREEN_Y && in.vcount < (P1_SCREEN_Y + PLAYER_SIZE)) begin
+                
+                // Prosta obwódka dla gracza
+                if (in.hcount < P1_SCREEN_X + 2 || in.hcount >= P1_SCREEN_X + PLAYER_SIZE - 2 ||
+                    in.vcount < P1_SCREEN_Y + 2 || in.vcount >= P1_SCREEN_Y + PLAYER_SIZE - 2)
+                    rgb_nxt = 12'hFFF; // Biała obwódka
+                else
+                    rgb_nxt = 12'h0F0; // Zielony rdzeń (My)
+            end
+
+            // B. Rysowanie PRZECIWNIKA (nadpisuje gracza w razie bliskiego kontaktu)
+            else if (enemy_hp > 0 && enemy_visible) begin
                 if (in.hcount >= enemy_screen_x && in.hcount < (enemy_screen_x + PLAYER_SIZE) &&
                     in.vcount >= enemy_screen_y && in.vcount < (enemy_screen_y + PLAYER_SIZE)) begin
                     
-                    rgb_nxt = 12'hF00; // Czerwony kwadrat
+                    if (in.hcount < enemy_screen_x + 2 || in.hcount >= enemy_screen_x + PLAYER_SIZE - 2 ||
+                        in.vcount < enemy_screen_y + 2 || in.vcount >= enemy_screen_y + PLAYER_SIZE - 2)
+                        rgb_nxt = 12'hFFF; // Biała obwódka
+                    else
+                        rgb_nxt = 12'hF00; // Czerwony rdzeń (Wróg)
                 end
             end
 
-            // B. Rysowanie pocisku (Tylko jeśli aktywny i widoczny)
-            // Zauważ, że pocisk sprawdzamy PO przeciwniku - dzięki temu pocisk będzie
-            // rysowany "na wierzchu", przelatując nad graczem, a nie pod nim.
+            // C. Rysowanie POCISKU (najwyższy priorytet, rysowany na wierzchu)
             if (bullet_active && bullet_visible) begin
                 if (in.hcount >= bullet_screen_x && in.hcount < (bullet_screen_x + BULLET_SIZE) &&
                     in.vcount >= bullet_screen_y && in.vcount < (bullet_screen_y + BULLET_SIZE)) begin

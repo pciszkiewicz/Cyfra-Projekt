@@ -4,96 +4,94 @@ module bullet_ctl #(
     parameter int MAP_WIDTH_M  = 4096,
     parameter int MAP_HEIGHT_N = 4096,
     parameter int SCREEN_W     = 1024,
-    parameter int SCREEN_H     = 768
+    parameter int SCREEN_H     = 768,
+    parameter int PLAYER_SIZE  = 32       
 )(
     input  logic        clk,
-    input  logic        rst_n,           // Reset asynchroniczny
-
-    // Sygnał zezwalający na ruch (np. impuls z odświeżania klatki 60Hz)
+    input  logic        rst_n,           
     input  logic        update_tick,     
-
-    // Interfejs z myszką (LPM i koordynaty z ekranu)
     input  logic [11:0] mouse_x,
     input  logic [11:0] mouse_y,
     input  logic        mouse_lmb,
     
-    // Pozycja gracza (skąd wylatuje pocisk)
     input  logic [15:0] player_world_x,
     input  logic [15:0] player_world_y,
+    input  logic [7:0]  player_dmg,      
 
-    // Sygnały kolizji z zewnętrznego modułu
     input  logic        hit_wall,
     input  logic        hit_enemy,
-    input  logic        phase_combat,    // Pochodzi z game_fsm (czy jesteśmy w ST_COMBAT)
+    input  logic        phase_combat,    
 
-    // Wyjścia (stan pocisku w globalnym świecie)
     output logic [15:0] bullet_world_x,
     output logic [15:0] bullet_world_y,
-    output logic        bullet_active
+    output logic        bullet_active,
+    output logic [7:0]  bullet_dmg       
 );
 
     localparam int CENTER_X = SCREEN_W / 2;
     localparam int CENTER_Y = SCREEN_H / 2;
 
-    // --- Rejestry stanu pocisku i ich stany następne ---
     logic [15:0] bullet_x_reg, bullet_x_nxt;
     logic [15:0] bullet_y_reg, bullet_y_nxt;
     logic        active_reg, active_nxt;
+    
+    logic [7:0]  bullet_dmg_reg, bullet_dmg_nxt; 
+    logic [5:0]  cooldown_reg, cooldown_nxt;     
 
-    // Zarejestrowany wektor prędkości ze znakiem
     logic signed [7:0] vx_reg, vx_nxt;
     logic signed [7:0] vy_reg, vy_nxt;
 
-    // --- Zmienne pomocnicze (logika kombinacyjna) ---
     logic signed [12:0] dx, dy;
     logic signed [12:0] abs_dx, abs_dy;
     logic [3:0]         shift_val;
     logic signed [7:0]  calc_vx, calc_vy;
 
-    // 1. BLOK SEKWENCYJNY (Zapis do rejestrów z asynchronicznym resetem)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            bullet_x_reg <= 16'h0;
-            bullet_y_reg <= 16'h0;
-            active_reg   <= 1'b0;
-            vx_reg       <= 8'h0;
-            vy_reg       <= 8'h0;
+            bullet_x_reg   <= 16'h0;
+            bullet_y_reg   <= 16'h0;
+            active_reg     <= 1'b0;
+            vx_reg         <= 8'h0;
+            vy_reg         <= 8'h0;
+            bullet_dmg_reg <= 8'h0;
+            cooldown_reg   <= 6'h0;
         end else begin
-            bullet_x_reg <= bullet_x_nxt;
-            bullet_y_reg <= bullet_y_nxt;
-            active_reg   <= active_nxt;
-            vx_reg       <= vx_nxt;
-            vy_reg       <= vy_nxt;
+            bullet_x_reg   <= bullet_x_nxt;
+            bullet_y_reg   <= bullet_y_nxt;
+            active_reg     <= active_nxt;
+            vx_reg         <= vx_nxt;
+            vy_reg         <= vy_nxt;
+            bullet_dmg_reg <= bullet_dmg_nxt;
+            cooldown_reg   <= cooldown_nxt;
         end
     end
 
-    // 2. BLOK KOMBINACYJNY (Logika ruchu, strzału i kolizji)
     always_comb begin
-        // Domyślne utrzymanie stanu
-        bullet_x_nxt = bullet_x_reg;
-        bullet_y_nxt = bullet_y_reg;
-        active_nxt   = active_reg;
-        vx_nxt       = vx_reg;
-        vy_nxt       = vy_reg;
+        bullet_x_nxt   = bullet_x_reg;
+        bullet_y_nxt   = bullet_y_reg;
+        active_nxt     = active_reg;
+        vx_nxt         = vx_reg;
+        vy_nxt         = vy_reg;
+        bullet_dmg_nxt = bullet_dmg_reg;
+        
+        if (cooldown_reg > 0 && update_tick) cooldown_nxt = cooldown_reg - 1;
+        else                                 cooldown_nxt = cooldown_reg;
 
-        // A. Wyznaczanie kierunku (delta X i delta Y od środka ekranu)
         dx = signed'({1'b0, mouse_x}) - signed'(CENTER_X);
         dy = signed'({1'b0, mouse_y}) - signed'(CENTER_Y);
         
-        // Moduł (wartość bezwzględna) do znalezienia wiodącej wartości
         abs_dx = (dx < 0) ? -dx : dx;
         abs_dy = (dy < 0) ? -dy : dy;
 
-        // B. Dynamiczne wyznaczanie dzielnika (przesunięcia bitowego)
-        // Działa to jak sprzętowe szacowanie logarytmu przy podstawie 2.
-        // Jeśli myszka jest daleko, dzielimy przez większą potęgę dwójki, 
-        // aby prędkość maksymalna była mniej więcej stała.
+        // Sprzętowa aproksymacja normalizacji wektora (bez użycia dzielnika z biblioteki DSP).
+        // Szukamy osi o największym odchyleniu i na jej podstawie dobieramy stałą dzielenia (shift_val), 
+        // co działa jak dzielenie wektora przez potęgi dwójki. Wyrównuje to prędkość lotu pocisku.
         if (abs_dx > abs_dy) begin
-            if      (abs_dx > 512) shift_val = 4'd6; // / 64
-            else if (abs_dx > 256) shift_val = 4'd5; // / 32
-            else if (abs_dx > 128) shift_val = 4'd4; // / 16
-            else if (abs_dx > 64)  shift_val = 4'd3; // / 8
-            else                   shift_val = 4'd2; // / 4
+            if      (abs_dx > 512) shift_val = 4'd6; 
+            else if (abs_dx > 256) shift_val = 4'd5; 
+            else if (abs_dx > 128) shift_val = 4'd4; 
+            else if (abs_dx > 64)  shift_val = 4'd3; 
+            else                   shift_val = 4'd2; 
         end else begin
             if      (abs_dy > 512) shift_val = 4'd6;
             else if (abs_dy > 256) shift_val = 4'd5;
@@ -102,19 +100,24 @@ module bullet_ctl #(
             else                   shift_val = 4'd2;
         end
 
-        // Aplikacja arytmetycznego przesunięcia bitowego w prawo (zachowuje znak)
+        // Operacja >>> to przesunięcie arytmetyczne, które w odróżnieniu od logicznego (>>)
+        // zachowuje bit znaku, dzięki czemu pocisk poprawnie poleci też w lewo/górę (ujemne wektory).
         calc_vx = signed'(dx >>> shift_val);
         calc_vy = signed'(dy >>> shift_val);
 
-        // C. Maszyna zachowań pocisku
         if (!active_reg) begin
-            // Tworzenie pocisku, gdy LPM kliknięty w trakcie fazy walki
-            if (mouse_lmb && phase_combat) begin
-                active_nxt   = 1'b1;
-                bullet_x_nxt = player_world_x;
-                bullet_y_nxt = player_world_y;
+            if (mouse_lmb && phase_combat && cooldown_reg == 0) begin
+                active_nxt     = 1'b1;
                 
-                // Zabezpieczenie przed strzałem w punkt (0,0), dajemy domyślny wektor (np. w prawo)
+                // Zatrzaskujemy obrażenia w rejestrze pocisku w momencie kliknięcia.
+                // Pocisk staje się niezależnym bytem i ewentualne modyfikatory mocy gracza 
+                // zebrane po wystrzale nie zmienią w locie zadawanych przez niego obrażeń.
+                bullet_dmg_nxt = player_dmg; 
+                
+                // Wyśrodkowanie spawnu pocisku na środek sprite'a gracza
+                bullet_x_nxt = player_world_x + (PLAYER_SIZE / 2);
+                bullet_y_nxt = player_world_y + (PLAYER_SIZE / 2);
+                
                 if (calc_vx == 0 && calc_vy == 0) begin
                     vx_nxt = 8'd10; 
                     vy_nxt = 8'd0;
@@ -124,23 +127,21 @@ module bullet_ctl #(
                 end
             end
         end else begin
-            // Aktualizacja pozycji tylko podczas taktu odświeżania (update_tick)
             if (update_tick) begin
                 bullet_x_nxt = unsigned'(signed'({1'b0, bullet_x_reg}) + vx_reg);
                 bullet_y_nxt = unsigned'(signed'({1'b0, bullet_y_reg}) + vy_reg);
             end
 
-            // Niszczenie pocisku: kolizja ze ścianą, wrogiem lub wylot poza całkowitą mapę MxN
-            if (hit_wall || hit_enemy || 
-                bullet_x_reg > MAP_WIDTH_M || bullet_y_reg > MAP_HEIGHT_N) begin
-                active_nxt = 1'b0;
+            if (hit_wall || hit_enemy || bullet_x_reg > MAP_WIDTH_M || bullet_y_reg > MAP_HEIGHT_N) begin
+                active_nxt   = 1'b0;
+                cooldown_nxt = 6'd15; 
             end
         end
     end
 
-    // 3. PRZYPISANIE WYJŚĆ
     assign bullet_world_x = bullet_x_reg;
     assign bullet_world_y = bullet_y_reg;
     assign bullet_active  = active_reg;
+    assign bullet_dmg     = bullet_dmg_reg;
 
 endmodule
