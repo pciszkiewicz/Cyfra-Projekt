@@ -1,39 +1,23 @@
-/**
- * MTM UEC2
- * Author: Piotr Ciszkiewicz, Tomasz Jesionek
- *
- * Description:
- * Top-level hardware module for Basys 3 FPGA implementation.
- * Integrates synchronized mouse signals, internal PLL clocks,
- * and external PMOD pins for multi-board serial communication.
- */
+`timescale 1 ns / 1 ps
 
- `timescale 1 ns / 1 ps
-
- module top_vga_basys3 (
-     input  wire        clk,        // Fizyczny zegar 100 MHz z płytki Basys 3
-     input  wire        btnC,       // Główny przycisk resetu (aktywny stanem wysokim)
-     input  wire        btnU,       // Dodatkowy przycisk funkcyjny/testowy
+module top_vga_basys3 (
+    input  wire        clk,        
+    input  wire        btnC,       
+    input  wire        btnU,       
+    input  wire        sw0,        // NOWE: Przełącznik Master (1) / Slave (0)
      
-     // Fizyczne linie interfejsu myszy PS/2
-     inout  wire        PS2Clk,
-     inout  wire        PS2Data,
+    inout  wire        PS2Clk,
+    inout  wire        PS2Data,
      
-     // Wyjścia interfejsu wideo VGA na drabinkę rezystorową R-2R
-     output wire        Vsync,
-     output wire        Hsync,
-     output wire [3:0]  vgaRed,
-     output wire [3:0]  vgaGreen,
-     output wire [3:0]  vgaBlue,
+    output wire        Vsync,
+    output wire        Hsync,
+    output wire [3:0]  vgaRed,
+    output wire [3:0]  vgaGreen,
+    output wire [3:0]  vgaBlue,
  
-     // Fizyczne linie złącza PMOD JA (Multiplayer UART Full-Duplex)
-     input  wire        JA1,        // PMOD JA Pin 1: Sygnał wejściowy RX (Odbiór)
-     output wire        JA2         // PMOD JA Pin 2: Sygnał wyjściowy TX (Nadawanie)
- );
- 
-    // =========================================================================
-// 1. STRUKTURA ZEGARÓW I UNIFIKACJA RESETU ASYNCHRONICZNEGO
-// =========================================================================
+    input  wire        JA1,        
+    output wire        JA2         
+);
 
 logic clk_65MHz;
 logic clk_100MHz_internal;
@@ -49,7 +33,6 @@ clk_wiz_0 u_clk_wiz (
     .locked(clk_locked)
 );
 
-// Agregacja sygnałów: resetujemy, gdy brakuje stabilnego zegara LUB wciśnięto przycisk
 wire async_rst_n = clk_locked & ~btnC;
 
 always_ff @(posedge clk_65MHz or negedge async_rst_n) begin
@@ -72,48 +55,37 @@ always_ff @(posedge clk_100MHz_internal or negedge async_rst_n) begin
     end
 end
  
-     // =========================================================================
-     // 2. SYNCHRONIZACJA PRZYCISKÓW POMOCNICZYCH
-     // =========================================================================
-     
-     logic btnu_sync1, btnu_sync2;
-     
-     always_ff @(posedge clk_65MHz or negedge rst_sys_n_sync2) begin
-         if (!rst_sys_n_sync2) begin
-             btnu_sync1 <= 1'b0;
-             btnu_sync2 <= 1'b0;
-         end else begin
-             btnu_sync1 <= btnU;
-             btnu_sync2 <= btnu_sync1;
-         end
-     end
+logic btnu_sync1, btnu_sync2;
+logic sw0_sync1,  sw0_sync2;
+
+always_ff @(posedge clk_65MHz or negedge rst_sys_n_sync2) begin
+    if (!rst_sys_n_sync2) begin
+        btnu_sync1 <= 1'b0;
+        btnu_sync2 <= 1'b0;
+        sw0_sync1  <= 1'b0;
+        sw0_sync2  <= 1'b0;
+    end else begin
+        btnu_sync1 <= btnU;
+        btnu_sync2 <= btnu_sync1;
+        sw0_sync1  <= sw0;
+        sw0_sync2  <= sw0_sync1;
+    end
+end
  
-     // =========================================================================
-     // 3. INSTANCJONOWANIE GŁÓWNEGO POTOKU LOGIKI I WIDEO
-     // =========================================================================
-     
-     top_vga u_top_vga (
-         .clk_65MHz(clk_65MHz),                  // Przekazanie wygenerowanego zegara 65 MHz
-         .clk_100MHz(clk_100MHz_internal),       // Przekazanie wygenerowanego zegara 100 MHz
-         
-         // Zsynchronizowane, bezpieczne sygnały resetów asynchronicznych
-         .rst_sys_n(rst_sys_n_sync2),     
-         .rst_100m_n(rst_100m_n_sync2),     
-         
-         // Sygnały wyjściowe wideo na złącze monitora
-         .vs(Vsync),
-         .hs(Hsync),
-         .r(vgaRed),
-         .g(vgaGreen),
-         .b(vgaBlue),
-         
-         // Dwukierunkowe piny interfejsu PS/2
-         .ps2_clk(PS2Clk),
-         .ps2_data(PS2Data),
-         
-         // Pomiędzy-płytkowe linie szeregowe UART wpięte bezpośrednio w piny PMOD
-         .uart_rx(JA1),                
-         .uart_tx(JA2)                 
-     );
- 
- endmodule
+top_vga u_top_vga (
+    .clk_65MHz(clk_65MHz),                  
+    .clk_100MHz(clk_100MHz_internal),       
+    .rst_sys_n(rst_sys_n_sync2),     
+    .rst_100m_n(rst_100m_n_sync2),     
+    .is_master(sw0_sync2),           // NOWE: Przekazanie roli
+    .vs(Vsync),
+    .hs(Hsync),
+    .r(vgaRed),
+    .g(vgaGreen),
+    .b(vgaBlue),
+    .ps2_clk(PS2Clk),
+    .ps2_data(PS2Data),
+    .uart_rx(JA1),      
+    .uart_tx(JA2)                 
+);
+endmodule

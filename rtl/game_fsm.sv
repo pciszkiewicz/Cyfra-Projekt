@@ -1,14 +1,11 @@
-/**
- * MTM UEC2
- * Author: Tomasz Jesionek
- *
- * Description:
- * Game state machine (FSM).
- */
+`timescale 1 ns / 1 ps
 
- module game_fsm (
+module game_fsm (
     input  logic        clk,
     input  logic        rst_n,
+    input  logic        is_master,
+    input  logic [31:0] rx_active_crates,
+    input  logic [31:0] rx_active_loot,
     output logic [7:0]  rom_addr,
     output logic [31:0] active_crates,
     output logic [31:0] active_loot,
@@ -35,11 +32,8 @@ typedef enum logic [2:0] {
 state_t state;
 state_t state_nxt;
 
-logic [31:0] active_crates_reg;
-logic [31:0] active_crates_nxt;
-logic [31:0] active_loot_reg;
-logic [31:0] active_loot_nxt;
-
+logic [31:0] active_crates_reg, active_crates_nxt;
+logic [31:0] active_loot_reg, active_loot_nxt;
 logic [31:0] newly_destroyed_crates;
 
 always_ff @(posedge clk or negedge rst_n) begin
@@ -58,34 +52,32 @@ always_comb begin
     state_nxt              = state;
     active_crates_nxt      = active_crates_reg;
     active_loot_nxt        = active_loot_reg;
-
     rom_addr               = lfsr_val;
-    
-    // Wykrywanie, które skrzynki zostały zniszczone w tym takcie
     newly_destroyed_crates = active_crates_reg & crates_hit_mask;
 
     case (state)
         ST_INIT: begin
-            if (start_btn) begin
-                state_nxt = ST_CHAR_SELECT;
-            end
+            if (start_btn) state_nxt = ST_CHAR_SELECT;
         end
 
         ST_CHAR_SELECT: begin
             if(char_select_btn) begin
                 state_nxt = ST_LOOTING;
-                // Inicjalizacja skrzynek na mapie po wyborze postaci
-                active_crates_nxt = rom_data;
-                active_loot_nxt   = 32'h0;
+                if (is_master) begin
+                    active_crates_nxt = rom_data;
+                    active_loot_nxt   = 32'h0;
+                end
             end
         end
         
         ST_LOOTING: begin
-            // Usunięcie zniszczonych skrzynek
-            active_crates_nxt = active_crates_reg & ~crates_hit_mask;
-            
-            // Loot pojawia się w zniszczonych skrzynkach i znika po zebraniu
-            active_loot_nxt = (active_loot_reg | newly_destroyed_crates) & ~loot_collected_mask;
+            if (is_master) begin
+                active_crates_nxt = active_crates_reg & ~crates_hit_mask;
+                active_loot_nxt = (active_loot_reg | newly_destroyed_crates) & ~loot_collected_mask;
+            end else begin
+                active_crates_nxt = rx_active_crates;
+                active_loot_nxt   = rx_active_loot;
+            end
             
             if (phase_timeout) begin
                 state_nxt         = ST_COMBAT;
@@ -95,21 +87,14 @@ always_comb begin
         end
         
         ST_COMBAT: begin
-            // Warunek wyjścia z fazy walki - śmierć któregokolwiek gracza
-            if (p1_dead || p2_dead) begin
-                state_nxt = ST_END;
-            end
+            if (p1_dead || p2_dead) state_nxt = ST_END;
         end
         
         ST_END: begin
-            if (start_btn) begin
-                state_nxt = ST_INIT;
-            end
+            if (start_btn) state_nxt = ST_INIT;
         end
         
-        default: begin
-            state_nxt = ST_INIT;
-        end
+        default: state_nxt = ST_INIT;
     endcase
 end
 

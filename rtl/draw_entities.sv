@@ -9,7 +9,7 @@
 
  `timescale 1 ns / 1 ps
 
-module draw_entities #(
+ module draw_entities #(
     parameter int PLAYER_SIZE = 32,
     parameter int BULLET_SIZE = 4,
     parameter int SCREEN_W    = 1024,
@@ -30,7 +30,12 @@ module draw_entities #(
 
     input  logic [15:0] bullet_world_x,
     input  logic [15:0] bullet_world_y,
-    input  logic        bullet_active
+    input  logic        bullet_active,
+    
+    // DODANE: Pocisk wroga
+    input  logic [15:0] enemy_bullet_x,
+    input  logic [15:0] enemy_bullet_y,
+    input  logic        enemy_bullet_active
 );
 
     // Stała pozycja lokalnego gracza na ekranie (zawsze na środku)
@@ -68,6 +73,22 @@ module draw_entities #(
         .obj_screen_x(bullet_screen_x),
         .obj_screen_y(bullet_screen_y),
         .visible(bullet_visible)
+    );
+
+    // Translacja pocisku wroga
+    logic [11:0] enemy_bullet_screen_x, enemy_bullet_screen_y;
+    logic        enemy_bullet_visible;
+
+    cam_translation u_cam_enemy_bullet (
+        .clk(clk),
+        .rst_n(rst_n),
+        .player_world_x(cam_world_x),
+        .player_world_y(cam_world_y),
+        .obj_world_x(enemy_bullet_x),
+        .obj_world_y(enemy_bullet_y),
+        .obj_screen_x(enemy_bullet_screen_x),
+        .obj_screen_y(enemy_bullet_screen_y),
+        .visible(enemy_bullet_visible)
     );
 
     // =========================================================================
@@ -122,16 +143,21 @@ module draw_entities #(
                 end
             end
 
-            // C. Rysowanie POCISKU (najwyższy priorytet, rysowany na wierzchu)
+            // Rysowanie WŁASNEGO POCISKU
             if (bullet_active && bullet_visible) begin
                 if (in.hcount >= bullet_screen_x && in.hcount < (bullet_screen_x + BULLET_SIZE) &&
                     in.vcount >= bullet_screen_y && in.vcount < (bullet_screen_y + BULLET_SIZE)) begin
-                    
                     rgb_nxt = 12'hFF0; // Żółty pocisk
                 end
             end
             
+            // Rysowanie POCISKU WROGA
+            if (enemy_bullet_active && enemy_bullet_visible) begin
+                if (in.hcount >= enemy_bullet_screen_x && in.hcount < (enemy_bullet_screen_x + BULLET_SIZE) &&
+                    in.vcount >= enemy_bullet_screen_y && in.vcount < (enemy_bullet_screen_y + BULLET_SIZE)) begin
+                    rgb_nxt = 12'hF80; // Pomarańczowy pocisk wroga
+                end
+            end
         end
     end
-
 endmodule

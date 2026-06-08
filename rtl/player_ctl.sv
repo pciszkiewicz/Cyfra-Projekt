@@ -16,24 +16,27 @@ module player_ctl #(
     
     input  logic [1:0]  char_class,     
     input  logic        load_stats,     
-    
-    // NOWE: Port synchronizujący ruch do 60 Hz
     input  logic        update_tick,  
     
     input  logic        take_dmg_en,  
     input  logic [7:0]  take_dmg_val, 
     
+    // Looting - wejścia z detekcji
+    input  logic        apply_heal,
+    input  logic        apply_dmg_boost,
+    input  logic        apply_speed_boost,
+
+    // Ściany - bezpieczne CDC z pamięci
+    input  logic        is_wall_ahead,
+    output logic [15:0] next_x_out,
+    output logic [15:0] next_y_out,
+
     output logic [15:0] world_x,
     output logic [15:0] world_y,
     output logic [7:0]  hp,
     output logic [7:0]  dmg,            
     output logic        is_dead
 );
-    logic [15:0] world_x_reg, world_x_nxt;
-    logic [15:0] world_y_reg, world_y_nxt;
-    logic [7:0]  hp_reg, hp_nxt;
-    logic [7:0]  dmg_reg, dmg_nxt;
-    logic [3:0]  speed_reg, speed_nxt;
 
     localparam int CENTER_X = SCREEN_W / 2;
     localparam int CENTER_Y = SCREEN_H / 2;
@@ -43,6 +46,25 @@ module player_ctl #(
     localparam int CENTER_Y_U = CENTER_Y - DEADZONE;
     localparam int CENTER_Y_D = CENTER_Y + DEADZONE;
 
+    logic [15:0] world_x_reg, world_y_reg;
+    logic [7:0]  hp_reg, dmg_reg;
+    logic [3:0]  speed_reg;
+
+    logic [15:0] req_x, req_y;
+    logic [1:0]  move_pending;
+
+    logic [15:0] temp_x, temp_y;
+    always_comb begin
+        temp_x = world_x_reg;
+        temp_y = world_y_reg;
+        
+        if (mouse_x < CENTER_X_L && temp_x > speed_reg) temp_x = temp_x - speed_reg;
+        else if (mouse_x > CENTER_X_R && temp_x < MAP_WIDTH_M - PLAYER_SIZE) temp_x = temp_x + speed_reg;
+        
+        if (mouse_y < CENTER_Y_U && temp_y > speed_reg) temp_y = temp_y - speed_reg;
+        else if (mouse_y > CENTER_Y_D && temp_y < MAP_HEIGHT_N - PLAYER_SIZE) temp_y = temp_y + speed_reg;
+    end
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             world_x_reg <= MAP_WIDTH_M / 2;
@@ -50,53 +72,59 @@ module player_ctl #(
             hp_reg      <= 8'd100;
             dmg_reg     <= 8'd25;
             speed_reg   <= 4'd4;
+            req_x       <= MAP_WIDTH_M / 2;
+            req_y       <= MAP_HEIGHT_N / 2;
+            move_pending <= 2'b0;
         end else begin
-            world_x_reg <= world_x_nxt;
-            world_y_reg <= world_y_nxt;
-            hp_reg      <= hp_nxt;
-            dmg_reg     <= dmg_nxt;
-            speed_reg   <= speed_nxt;
+            if (load_stats) begin
+                case (char_class)
+                    2'b00: begin hp_reg <= 8'd100; speed_reg <= 4'd4; dmg_reg <= 8'd25; end 
+                    2'b01: begin hp_reg <= 8'd200; speed_reg <= 4'd2; dmg_reg <= 8'd15; end 
+                    2'b10: begin hp_reg <= 8'd75;  speed_reg <= 4'd6; dmg_reg <= 8'd10; end 
+                    2'b11: begin hp_reg <= 8'd50;  speed_reg <= 4'd3; dmg_reg <= 8'd50; end 
+                endcase
+                world_x_reg <= MAP_WIDTH_M / 2;
+                world_y_reg <= MAP_HEIGHT_N / 2;
+                move_pending <= 2'b0;
+            end else begin
+                // Obrażenia
+                if (take_dmg_en && hp_reg > 0) begin
+                    if (hp_reg >= take_dmg_val) hp_reg <= hp_reg - take_dmg_val;
+                    else                        hp_reg <= 8'd0;
+                end
+                
+                // Ulepszenia (Looting)
+                if (apply_heal && hp_reg > 0) begin
+                    if (hp_reg < 255 - 25) hp_reg <= hp_reg + 25;
+                    else                   hp_reg <= 255;
+                end
+                if (apply_dmg_boost) dmg_reg <= dmg_reg + 5;
+                if (apply_speed_boost && speed_reg < 15) speed_reg <= speed_reg + 1;
+
+                // Faza 1: Obliczenie wektora
+                // Faza 1: Obliczenie wektora
+                if (update_tick && hp_reg > 0 && mouse_rmb) begin
+                    req_x <= temp_x;
+                    req_y <= temp_y;
+                    move_pending[0] <= 1'b1;
+                end else begin
+                    move_pending[0] <= 1'b0;
+                end
+                
+                // Faza 2: Czekamy 1 takt na odpowiedź z BRAM i aplikujemy ruch
+                move_pending[1] <= move_pending[0];
+                if (move_pending[1]) begin
+                    if (!is_wall_ahead) begin
+                        world_x_reg <= req_x;
+                        world_y_reg <= req_y;
+                    end
+                end
+            end
         end
     end
 
-    always_comb begin
-        world_x_nxt = world_x_reg;
-        world_y_nxt = world_y_reg;
-        hp_nxt      = hp_reg;
-        dmg_nxt     = dmg_reg;
-        speed_nxt   = speed_reg;
-
-        if (load_stats) begin
-            case (char_class)
-                2'b00: begin hp_nxt = 8'd100; speed_nxt = 4'd4; dmg_nxt = 8'd25; end 
-                2'b01: begin hp_nxt = 8'd200; speed_nxt = 4'd2; dmg_nxt = 8'd15; end 
-                2'b10: begin hp_nxt = 8'd75;  speed_nxt = 4'd6; dmg_nxt = 8'd10; end 
-                2'b11: begin hp_nxt = 8'd50;  speed_nxt = 4'd3; dmg_nxt = 8'd50; end 
-            endcase
-            world_x_nxt = MAP_WIDTH_M / 2;
-            world_y_nxt = MAP_HEIGHT_N / 2;
-        end
-        // POPRAWKA: Ruch gracza wykonuje się tylko podczas ticku 60Hz
-        else if (hp_reg > 0 && mouse_rmb && update_tick) begin
-            if (mouse_x < CENTER_X_L) begin
-                if (world_x_reg > speed_reg) world_x_nxt = world_x_reg - speed_reg;
-            end else if (mouse_x > CENTER_X_R) begin
-                if (world_x_reg < MAP_WIDTH_M - PLAYER_SIZE) world_x_nxt = world_x_reg + speed_reg;
-            end
-            
-            if (mouse_y < CENTER_Y_U) begin
-                if (world_y_reg > speed_reg) world_y_nxt = world_y_reg - speed_reg;
-            end else if (mouse_y > CENTER_Y_D) begin
-                if (world_y_reg < MAP_HEIGHT_N - PLAYER_SIZE) world_y_nxt = world_y_reg + speed_reg;
-            end
-        end
-        
-        if (take_dmg_en && hp_reg > 0 && !load_stats) begin
-            if (hp_reg >= take_dmg_val) hp_nxt = hp_reg - take_dmg_val;
-            else                        hp_nxt = 8'd0;
-        end
-    end
-    
+    assign next_x_out = req_x;
+    assign next_y_out = req_y;
     assign world_x = world_x_reg;
     assign world_y = world_y_reg;
     assign hp      = hp_reg;

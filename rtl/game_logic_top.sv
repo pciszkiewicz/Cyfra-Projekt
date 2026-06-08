@@ -1,15 +1,11 @@
 `timescale 1 ns / 1 ps
 
-/**
- * MTM UEC2
- * Author: Piotr Ciszkiewicz
- *
- * Description:
- * Game logic top module connecting LFSR, ROM, and FSM.
- */
 module game_logic_top (
     input  logic        clk,
-    input  logic        rst_n,              // Reset asynchroniczny
+    input  logic        rst_n,              
+    input  logic        is_master,
+    input  logic [31:0] rx_active_crates,
+    input  logic [31:0] rx_active_loot,
     output logic [31:0] active_crates,
     output logic [31:0] active_loot,
     output logic [2:0]  current_state,
@@ -18,11 +14,9 @@ module game_logic_top (
     input  logic        phase_timeout,
     input  logic [31:0] crates_hit_mask,
     input  logic [31:0] loot_collected_mask,
-    // Dodane porty śmierci pod nasz zaktualizowany game_fsm.sv
     input  logic        p1_dead,
     input  logic        p2_dead
 );
-
     logic [15:0] lfsr_out;
     logic [31:0] rom_data_out;
     logic [7:0]  rom_addr;
@@ -33,7 +27,6 @@ module game_logic_top (
         .clk(clk),
         .rst_n(rst_n),
         .rand_out(lfsr_out),
-        // LFSR kręci się cały czas, zapewniając losowość na podstawie momentu kliknięcia przycisku
         .en(1'b1) 
     );
 
@@ -46,6 +39,9 @@ module game_logic_top (
     game_fsm u_game_fsm (
         .clk(clk),
         .rst_n(rst_n),
+        .is_master(is_master),
+        .rx_active_crates(rx_active_crates),
+        .rx_active_loot(rx_active_loot),
         .rom_addr(rom_addr),
         .active_crates(active_crates),
         .active_loot(active_loot),
@@ -60,5 +56,4 @@ module game_logic_top (
         .p1_dead(p1_dead),
         .p2_dead(p2_dead)
     );
-
 endmodule

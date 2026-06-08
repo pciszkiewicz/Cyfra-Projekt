@@ -17,8 +17,8 @@ module draw_crates (
     input  logic [31:0] active_loot
 );
 
-logic [11:0] crate_x [32];
-logic [11:0] crate_y [32];
+logic [15:0] crate_x [32];
+logic [15:0] crate_y [32];
 
 genvar i;
 generate

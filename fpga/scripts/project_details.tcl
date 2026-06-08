@@ -46,6 +46,7 @@ set sv_files {
     ../rtl/cam_translation.sv
     ../rtl/bullet_ctl.sv
     ../rtl/collision_det.sv
+    ../rtl/crates_collision_det.sv
     ../rtl/uart_tx.sv
     ../rtl/uart_rx.sv
     ../rtl/uart_packet_ctl.sv
@@ -76,7 +77,7 @@ set vhdl_files {
     ../rtl/MouseDisplay.vhd
 }
 
-# Pliki inicjalizacji pamięci ROM (układ mapy i skrzynek)
+# Pliki inicjalizacji pamięci ROM
 set mem_files {
     ../rtl/memory/crates_data.mem
     ../rtl/memory/map_walls.mem
