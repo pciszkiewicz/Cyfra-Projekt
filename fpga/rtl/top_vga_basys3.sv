@@ -31,48 +31,46 @@
      output wire        JA2         // PMOD JA Pin 2: Sygnał wyjściowy TX (Nadawanie)
  );
  
-     // =========================================================================
-     // 1. STRUKTURA ZEGARÓW I UNIFIKACJA RESETU ASYNCHRONICZNEGO
-     // =========================================================================
-     
-     logic clk_65MHz;
-     logic clk_100MHz_internal;
-     logic clk_locked;
-     
-     logic rst_sys_n_sync1, rst_sys_n_sync2;
-     logic rst_100m_n_sync1, rst_100m_n_sync2;
- 
-     // Generator dedykowanych domen zegarowych (IP Core Xilinx LogiCORE)
-     clk_wiz_0 u_clk_wiz (
-         .clk(clk),
-         .clk100Mhz(clk_100MHz_internal),
-         .clk65Mhz(clk_65MHz),
-         .locked(clk_locked)
-     );
- 
-     // Dwuetapowa synchronizacja dla domeny zegara pikselowego 65 MHz.
-     // Fizyczny przycisk btnC na Basys 3 jest aktywny w stanie wysokim (1 = wciśnięty).
-     // Negujemy go na wejściu, aby cały system pracował w standardzie 'active-low' (negedge).
-     always_ff @(posedge clk_65MHz or negedge clk_locked) begin
-         if (!clk_locked) begin
-             rst_sys_n_sync1 <= 1'b0;
-             rst_sys_n_sync2 <= 1'b0;
-         end else begin
-             rst_sys_n_sync1 <= ~btnC;
-             rst_sys_n_sync2 <= rst_sys_n_sync1;
-         end
-     end
- 
-     // Dwuetapowa synchronizacja dla domeny zegara systemowego 100 MHz (potrzebna dla MouseCtl).
-     always_ff @(posedge clk_100MHz_internal or negedge clk_locked) begin
-         if (!clk_locked) begin
-             rst_100m_n_sync1 <= 1'b0;
-             rst_100m_n_sync2 <= 1'b0;
-         end else begin
-             rst_100m_n_sync1 <= ~btnC;
-             rst_100m_n_sync2 <= rst_100m_n_sync1;
-         end
-     end
+    // =========================================================================
+// 1. STRUKTURA ZEGARÓW I UNIFIKACJA RESETU ASYNCHRONICZNEGO
+// =========================================================================
+
+logic clk_65MHz;
+logic clk_100MHz_internal;
+logic clk_locked;
+
+logic rst_sys_n_sync1, rst_sys_n_sync2;
+logic rst_100m_n_sync1, rst_100m_n_sync2;
+
+clk_wiz_0 u_clk_wiz (
+    .clk(clk),
+    .clk100Mhz(clk_100MHz_internal),
+    .clk65Mhz(clk_65MHz),
+    .locked(clk_locked)
+);
+
+// Agregacja sygnałów: resetujemy, gdy brakuje stabilnego zegara LUB wciśnięto przycisk
+wire async_rst_n = clk_locked & ~btnC;
+
+always_ff @(posedge clk_65MHz or negedge async_rst_n) begin
+    if (!async_rst_n) begin
+        rst_sys_n_sync1 <= 1'b0;
+        rst_sys_n_sync2 <= 1'b0;
+    end else begin
+        rst_sys_n_sync1 <= 1'b1;
+        rst_sys_n_sync2 <= rst_sys_n_sync1;
+    end
+end
+
+always_ff @(posedge clk_100MHz_internal or negedge async_rst_n) begin
+    if (!async_rst_n) begin
+        rst_100m_n_sync1 <= 1'b0;
+        rst_100m_n_sync2 <= 1'b0;
+    end else begin
+        rst_100m_n_sync1 <= 1'b1;
+        rst_100m_n_sync2 <= rst_100m_n_sync1;
+    end
+end
  
      // =========================================================================
      // 2. SYNCHRONIZACJA PRZYCISKÓW POMOCNICZYCH

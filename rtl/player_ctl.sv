@@ -17,6 +17,9 @@ module player_ctl #(
     input  logic [1:0]  char_class,     
     input  logic        load_stats,     
     
+    // NOWE: Port synchronizujący ruch do 60 Hz
+    input  logic        update_tick,  
+    
     input  logic        take_dmg_en,  
     input  logic [7:0]  take_dmg_val, 
     
@@ -26,11 +29,10 @@ module player_ctl #(
     output logic [7:0]  dmg,            
     output logic        is_dead
 );
-
     logic [15:0] world_x_reg, world_x_nxt;
     logic [15:0] world_y_reg, world_y_nxt;
     logic [7:0]  hp_reg, hp_nxt;
-    logic [7:0]  dmg_reg, dmg_nxt;      
+    logic [7:0]  dmg_reg, dmg_nxt;
     logic [3:0]  speed_reg, speed_nxt;
 
     localparam int CENTER_X = SCREEN_W / 2;
@@ -46,13 +48,13 @@ module player_ctl #(
             world_x_reg <= MAP_WIDTH_M / 2;
             world_y_reg <= MAP_HEIGHT_N / 2;
             hp_reg      <= 8'd100;
-            dmg_reg     <= 8'd25;           
+            dmg_reg     <= 8'd25;
             speed_reg   <= 4'd4;
         end else begin
             world_x_reg <= world_x_nxt;
             world_y_reg <= world_y_nxt;
             hp_reg      <= hp_nxt;
-            dmg_reg     <= dmg_nxt;         
+            dmg_reg     <= dmg_nxt;
             speed_reg   <= speed_nxt;
         end
     end
@@ -61,7 +63,7 @@ module player_ctl #(
         world_x_nxt = world_x_reg;
         world_y_nxt = world_y_reg;
         hp_nxt      = hp_reg;
-        dmg_nxt     = dmg_reg;              
+        dmg_nxt     = dmg_reg;
         speed_nxt   = speed_reg;
 
         if (load_stats) begin
@@ -74,7 +76,8 @@ module player_ctl #(
             world_x_nxt = MAP_WIDTH_M / 2;
             world_y_nxt = MAP_HEIGHT_N / 2;
         end
-        else if (hp_reg > 0 && mouse_rmb) begin
+        // POPRAWKA: Ruch gracza wykonuje się tylko podczas ticku 60Hz
+        else if (hp_reg > 0 && mouse_rmb && update_tick) begin
             if (mouse_x < CENTER_X_L) begin
                 if (world_x_reg > speed_reg) world_x_nxt = world_x_reg - speed_reg;
             end else if (mouse_x > CENTER_X_R) begin
@@ -90,14 +93,14 @@ module player_ctl #(
         
         if (take_dmg_en && hp_reg > 0 && !load_stats) begin
             if (hp_reg >= take_dmg_val) hp_nxt = hp_reg - take_dmg_val;
-            else                           hp_nxt = 8'd0;
+            else                        hp_nxt = 8'd0;
         end
     end
     
     assign world_x = world_x_reg;
     assign world_y = world_y_reg;
     assign hp      = hp_reg;
-    assign dmg     = dmg_reg;               
+    assign dmg     = dmg_reg;
     assign is_dead = (hp_reg == 8'd0);
 
 endmodule
