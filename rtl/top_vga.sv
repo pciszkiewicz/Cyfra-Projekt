@@ -181,6 +181,7 @@ module top_vga
     ) u_player_ctl (
         .clk               (clk_65MHz),
         .rst_n             (rst_sys_n),
+        .is_master         (is_master),
         .mouse_x           (mouse_x_sync2),
         .mouse_y           (mouse_y_sync2),
         .mouse_rmb         (mouse_right_sync2),

@@ -10,7 +10,7 @@ module top_vga_epic_tb;
     logic rst_sys_n = 0;
     logic rst_100m_n = 0;
     logic is_master = 1;
-
+    
     always #7.692 clk_65MHz  = ~clk_65MHz;   // ~65 MHz
     always #5.000 clk_100MHz = ~clk_100MHz;  // 100 MHz
 
@@ -44,21 +44,18 @@ module top_vga_epic_tb;
     // -------------------------------------------------------------
     // SPRZĘGŁO Z TIFF_WRITER (Synchronizacja obrazu)
     // -------------------------------------------------------------
-    // Pobieramy sygnały wygaszania (blanking) z najniższego poziomu top_vga, 
-    // aby kolory były idealnie zsynchronizowane.
     wire vde = ~uut.mouse_to_out.vblnk && ~uut.mouse_to_out.hblnk;
-
-    // Zegar tiff_writer'a "tyka" TYLKO w obszarze aktywnego obrazu (1024x768),
-    // dzięki czemu pomijamy front/back porch w pliku graficznym.
-    wire clk_tiff = clk_65MHz & vde;
+    
+    // Zabezpieczenie przed sztucznymi zboczami opadającymi dla tiff_writera
+    wire clk_tiff = clk_65MHz | ~vde;
 
     logic go_tiff = 0;
-
+    
     // Mapowanie 4-bitowych kolorów (VGA) na 8-bitowe formaty obrazka (TIFF)
     wire [7:0] r8 = {r, r};
     wire [7:0] g8 = {g, g};
     wire [7:0] b8 = {b, b};
-
+    
     tiff_writer #(
         .XDIM(16'd1024),
         .YDIM(16'd768),
@@ -71,26 +68,26 @@ module top_vga_epic_tb;
         .go(go_tiff)
     );
 
-    // Task kontrolujący poprawne przechwytywanie ramki do pliku
+    // -------------------------------------------------------------
+    // TASK PRZECHWYTYWANIA KLATKI DO PLIKU TIFF
+    // -------------------------------------------------------------
     task capture_frame();
-        // Czekamy na zbocze opadające synchronizacji pionowej
-        @(negedge vs);
+        // Czekamy na sygnał synchronizacji pionowej (początek wygaszania pionowego)
+        @(negedge vs); 
         
-        // Impuls "Start" dla tiff_writer
+        // Impuls 1: Otwiera plik i przygotowuje moduł na pierwsze aktywne piksele
         go_tiff = 1;
-        #10;
+        @(posedge clk_65MHz);
         go_tiff = 0;
-        
         $display("[%0t] TIFF Capture Started...", $time);
 
-        // Czekamy na następną ramkę - oznacza to koniec aktualnej matrycy pikseli
-        @(negedge vs);
+        // Czekamy, aż przeleci cała pełna klatka (aż do następnego wygaszania)
+        @(negedge vs); 
         
-        // Impuls "Stop"
+        // Impuls 2: Moduł prof. Crabilli wymaga drugiego sygnału 'go' aby zamknąć plik
         go_tiff = 1;
-        #10;
+        @(posedge clk_65MHz);
         go_tiff = 0;
-        
         $display("[%0t] TIFF Capture Finished!", $time);
     endtask
 
@@ -99,7 +96,6 @@ module top_vga_epic_tb;
     // -------------------------------------------------------------
     initial begin
         $display("--- Start epickiej symulacji ---");
-        
         // Resetowanie systemu
         rst_sys_n  = 0;
         rst_100m_n = 0;
@@ -107,7 +103,7 @@ module top_vga_epic_tb;
         rst_sys_n  = 1;
         rst_100m_n = 1;
 
-        // Czekamy aż sygnały wideo wystartują (kilka pierwszych klatek)
+        // Czekamy aż sygnały wideo wystartują (dwie pełne klatki na rozbieg)
         @(negedge vs);
         @(negedge vs);
 
@@ -129,8 +125,8 @@ module top_vga_epic_tb;
         // --- Gracz 1 (Ty) ---
         // Ustawiłem pozycję blisko środka (skrzynki LUT 16),
         // Kamera będzie w 100% poprawnie dążyć do ekranu
-        force uut.my_world_x = 16'd950;
-        force uut.my_world_y = 16'd1050;
+        force uut.my_world_x = 16'd32;
+        force uut.my_world_y = 16'd32;
         force uut.my_hp = 8'd85;
 
         // --- Wróg (Gracz 2) ---
@@ -150,21 +146,22 @@ module top_vga_epic_tb;
         force uut.enemy_bullet_y = 16'd1055;
 
         // --- Ustawienie mapy skrzyń ---
-        // Skrzynia nr 16 leży na środku pola bitwy (x=1024, y=1024). 
-        // Symulujemy, że została właśnie zniszczona! Znika z mapy (bit 16 na '0').
-        force uut.active_crates = 32'hFFFF_EFFF; // Wartość hEFFF na środku maski niszczy ID 16
-        // Aktywujemy loot w miejscu tej skrzyni! (bit 16 na '1')
-        force uut.active_loot   = 32'h0001_0000;
-
-        // --- Celownik Myszy ---
-        // Ty stoisz na 950, a z racji tego że gracz to środek ekranu (x=512), 
-        // to punkt x=1100 będzie widoczny na 512+(1100-950) = 662. Ustawiamy tam celownik.
-        force uut.mouse_x_sync2 = 12'd662;
-        force uut.mouse_y_sync2 = 12'd384; // na tej samej wysokosci
+        // Skrzynia nr 16 leży na środku pola bitwy (x=1024, y=1024).
+        // Niszczymy skrzynię maską hFFFE_FFFF (zerujemy dokładnie 16-ty bit)
+        force uut.active_crates = 32'hFFFE_FFFF; 
         
-        // Dajemy chwilkę by sygnały force przesiąknęły przez rurę rzutowania współrzędnych i potoki pikseli
-        #1000; 
-
+        // Aktywujemy loot w miejscu tej skrzyni (bit 16 na '1')
+        force uut.active_loot   = 32'h0001_0000;
+        
+        // --- Celownik Myszy ---
+        // Ty stoisz na 950, a gracz to zawsze środek ekranu (x=512), 
+        // to punkt wroga x=1100 będzie widoczny na 512+(1100-950) = 662.
+        force uut.mouse_x_sync2 = 12'd662;
+        force uut.mouse_y_sync2 = 12'd384; 
+        
+        // Dajemy chwilkę by sygnały "force" przesiąknęły przez sprzęt
+        #1000;
+        
         // --- ZDJĘCIE 2: WALKA ---
         $display("Scena 2: Rzeź niewiniątek w ST_COMBAT");
         capture_frame();

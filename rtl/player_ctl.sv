@@ -1,8 +1,8 @@
 `timescale 1 ns / 1 ps
 
 module player_ctl #(
-    parameter int MAP_WIDTH_M = 2048,  // Poprawione na wymiary 64x64
-    parameter int MAP_HEIGHT_N = 2048, // Poprawione na wymiary 64x64
+    parameter int MAP_WIDTH_M = 2048,  
+    parameter int MAP_HEIGHT_N = 2048, 
     parameter int SCREEN_W = 1024,
     parameter int SCREEN_H = 768,
     parameter int PLAYER_SIZE = 32
@@ -10,6 +10,8 @@ module player_ctl #(
     input  logic        clk,
     input  logic        rst_n,
     
+    input  logic        is_master,      // <--- DODANY SYGNAŁ Z TOPA
+
     input  logic [11:0] mouse_x,        
     input  logic [11:0] mouse_y,        
     input  logic        mouse_rmb,      
@@ -54,6 +56,7 @@ module player_ctl #(
     logic [2:0]  move_pending; // Rejestr 3-stopniowy dla BRAM
 
     logic [15:0] temp_x, temp_y;
+    
     always_comb begin
         temp_x = world_x_reg;
         temp_y = world_y_reg;
@@ -66,13 +69,14 @@ module player_ctl #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            world_x_reg <= MAP_WIDTH_M / 2;
-            world_y_reg <= MAP_HEIGHT_N / 2;
+            // Zależność punktu odrodzenia od przełącznika is_master
+            world_x_reg <= is_master ? 16'd128 : 16'd1888;
+            world_y_reg <= is_master ? 16'd128 : 16'd1888;
             hp_reg      <= 8'd100;
             dmg_reg     <= 8'd25;
             speed_reg   <= 4'd4;
-            req_x       <= MAP_WIDTH_M / 2;
-            req_y       <= MAP_HEIGHT_N / 2;
+            req_x       <= is_master ? 16'd128 : 16'd1888;
+            req_y       <= is_master ? 16'd128 : 16'd1888;
             move_pending <= 3'b0;
         end else begin
             if (load_stats) begin
@@ -82,8 +86,9 @@ module player_ctl #(
                     2'b10: begin hp_reg <= 8'd75;  speed_reg <= 4'd6; dmg_reg <= 8'd10; end 
                     2'b11: begin hp_reg <= 8'd50;  speed_reg <= 4'd3; dmg_reg <= 8'd50; end 
                 endcase
-                world_x_reg <= MAP_WIDTH_M / 2;
-                world_y_reg <= MAP_HEIGHT_N / 2;
+                // Zależność punktu odrodzenia przy starcie nowej gry
+                world_x_reg <= is_master ? 16'd128 : 16'd1888;
+                world_y_reg <= is_master ? 16'd128 : 16'd1888;
                 move_pending <= 3'b0;
             end else begin
                 if (take_dmg_en && hp_reg > 0) begin
@@ -95,8 +100,11 @@ module player_ctl #(
                     if (hp_reg < 255 - 25) hp_reg <= hp_reg + 25;
                     else                   hp_reg <= 255;
                 end
+                
                 if (apply_dmg_boost) dmg_reg <= dmg_reg + 5;
-                if (apply_speed_boost && speed_reg < 15) speed_reg <= speed_reg + 1;
+                
+                // POPRAWKA: Obniżony max speed_reg z 15 na 8, by zapobiec usterkom kolizji z kafelkami mapy
+                if (apply_speed_boost && speed_reg < 8) speed_reg <= speed_reg + 1;
 
                 if (update_tick && hp_reg > 0 && mouse_rmb) begin
                     req_x <= temp_x;

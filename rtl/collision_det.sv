@@ -14,7 +14,7 @@ module collision_det #(
     input  logic [15:0] enemy_x,
     input  logic [15:0] enemy_y,
 
-    output logic [13:0] map_addr,          
+    output logic [11:0] map_addr,          
     input  logic        map_data,     
 
     output logic        hit_enemy,
@@ -22,7 +22,7 @@ module collision_det #(
 );
 
     // --- STAGE 1: Adresowanie pamięci mapy (Kombinacyjne) ---
-    assign map_addr = {my_bullet_y[11:5], my_bullet_x[11:5]};
+    assign map_addr = {my_bullet_y[10:5], my_bullet_x[10:5]};
 
     // --- PIPELINE: Rejestry opóźniające pocisk o 1 takt (czekanie na BRAM) ---
     logic        active_d1;
