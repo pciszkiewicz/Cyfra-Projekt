@@ -43,28 +43,23 @@ module crates_collision_det (
     state_t state;
     
     logic [31:0] hit_mask_reg, loot_mask_reg;
+    logic [31:0] already_looted_reg; 
     
-    // Separacja logiki kombinacyjnej obliczającej kolizje
     logic hit_by_me, hit_by_enemy;
     logic looted_by_me, looted_by_enemy;
 
     always_comb begin
-        // Obliczanie trafień z pociskami
         hit_by_me = (my_bullet_active && my_bullet_x + 4 >= crate_x && my_bullet_x <= crate_x + 32 &&
                      my_bullet_y + 4 >= crate_y && my_bullet_y <= crate_y + 32);
-                     
         hit_by_enemy = (enemy_bullet_active && enemy_bullet_x + 4 >= crate_x && enemy_bullet_x <= crate_x + 32 &&
                         enemy_bullet_y + 4 >= crate_y && enemy_bullet_y <= crate_y + 32);
-                        
-        // Obliczanie wejścia na ulepszenie przez graczy
+
         looted_by_me = (player_x + 32 >= crate_x && player_x <= crate_x + 32 &&
                         player_y + 32 >= crate_y && player_y <= crate_y + 32);
-                        
         looted_by_enemy = (enemy_x + 32 >= crate_x && enemy_x <= crate_x + 32 &&
                            enemy_y + 32 >= crate_y && enemy_y <= crate_y + 32);
     end
 
-    // Sekwencyjna maszyna stanów
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE;
@@ -73,6 +68,7 @@ module crates_collision_det (
             loot_collected_mask <= 32'h0;
             hit_mask_reg <= 32'h0;
             loot_mask_reg <= 32'h0;
+            already_looted_reg <= 32'h0;
             apply_heal <= 1'b0;
             apply_dmg_boost <= 1'b0;
             apply_speed_boost <= 1'b0;
@@ -81,6 +77,11 @@ module crates_collision_det (
             apply_dmg_boost <= 1'b0;
             apply_speed_boost <= 1'b0;
             
+            // Oczyszczanie latacha gdy serwer fizycznie usunie loot
+            for (int i = 0; i < 32; i++) begin
+                if (!active_loot[i]) already_looted_reg[i] <= 1'b0;
+            end
+
             case (state)
                 IDLE: begin
                     if (update_tick) begin
@@ -94,24 +95,22 @@ module crates_collision_det (
                 end
                 
                 CHECK_CRATES: begin
-                    // Sprawdzanie zniszczenia aktywnych skrzynek
                     if (active_crates[crate_idx]) begin
                         if (hit_by_me || hit_by_enemy) hit_mask_reg[crate_idx] <= 1'b1;
                     end
                     
-                    // Sprawdzanie podniesienia aktywnego ulepszenia (Lootu)
                     if (active_loot[crate_idx]) begin
                         if (looted_by_me || looted_by_enemy) loot_mask_reg[crate_idx] <= 1'b1;
                         
-                        // Rozdzielanie bonusów tylko jeśli to MY podnieśliśmy loot
-                        if (looted_by_me) begin
+                        // Przydział bonusów - pojedynczy puls na łup
+                        if (looted_by_me && !already_looted_reg[crate_idx]) begin
+                            already_looted_reg[crate_idx] <= 1'b1;
                             if (crate_idx % 3 == 0)      apply_heal <= 1'b1;
                             else if (crate_idx % 3 == 1) apply_dmg_boost <= 1'b1;
                             else                         apply_speed_boost <= 1'b1;
                         end
                     end
                     
-                    // Iteracja po wszystkich 32 elementach
                     if (crate_idx == 5'd31) state <= DONE;
                     else                    crate_idx <= crate_idx + 1;
                 end

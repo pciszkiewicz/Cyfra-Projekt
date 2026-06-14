@@ -17,7 +17,7 @@
 (* rom_style = "block" *) logic [31:0] rom_memory [256];
 
 initial begin
-    $readmemb("crates_data.mem", rom_memory);
+    $readmemb("memory/crates_data.mem", rom_memory);
 end
 
 always_ff @(posedge clk) begin

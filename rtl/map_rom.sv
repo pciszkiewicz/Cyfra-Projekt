@@ -19,7 +19,7 @@
 (* rom_style = "block" *) logic [0:0] rom_memory [4096:0];
 
 initial begin
-    $readmemb("map_walls.mem", rom_memory);
+    $readmemb("memory/map_walls.mem", rom_memory);
 end
 
 always_ff @(posedge clk) begin

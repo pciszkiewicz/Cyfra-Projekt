@@ -21,7 +21,6 @@ module top_vga
     output logic       uart_tx
 );
 
-    // KASKADA VGA I SYNCHRONIZACJA
     vga_if timing_to_map();
     vga_if map_to_crates();
     vga_if crates_to_entities();
@@ -42,15 +41,12 @@ module top_vga
     end
     wire logic_tick_60hz = timing_to_map.vsync & ~vsync_reg;
 
-// MYSZ (CDC) - Dokładne nazwy, których szuka plik .xdc (usuwa Critical Warning)
     logic [11:0] mouse_x_raw, mouse_y_raw;
     logic        mouse_right_raw, mouse_left_raw, mouse_new_event, mouse_toggle_100;
-    
-    // Sygnały dla domeny 65 MHz
+
     logic [11:0] mouse_x_sync2, mouse_y_sync2;
     logic        mouse_right_sync2, mouse_left_sync2, mouse_event_65MHz;
 
-    // 1. Synchronizacja impulsu (zdarzenia) za pomocą Toggle Synchronizer
     always_ff @(posedge clk_100MHz or negedge rst_100m_n) begin
         if (!rst_100m_n) mouse_toggle_100 <= 1'b0;
         else if (mouse_new_event) mouse_toggle_100 <= ~mouse_toggle_100;
@@ -67,7 +63,6 @@ module top_vga
 
     assign mouse_event_65MHz = mouse_toggle_sync2 ^ mouse_toggle_sync3;
 
-    // 2. Dwustopniowa synchronizacja DANYCH myszy (z wymuszonym sync1 dla pliku .xdc)
     (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_x_sync1;
     (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_y_sync1;
     (* ASYNC_REG = "TRUE" *) logic        mouse_left_sync1;
@@ -79,20 +74,18 @@ module top_vga
             mouse_y_sync1     <= 12'h0;
             mouse_left_sync1  <= 1'b0;
             mouse_right_sync1 <= 1'b0;
-            
             mouse_x_sync2     <= 12'h0;
             mouse_y_sync2     <= 12'h0;
             mouse_left_sync2  <= 1'b0;
             mouse_right_sync2 <= 1'b0;
         end else begin
-            // Stopień 1: Przechwytuje dane asynchroniczne 
-            // (Vivado dzięki nazwie _sync1 wie, żeby nałożyć tu regułę set_max_delay)
-            mouse_x_sync1     <= mouse_x_raw;
-            mouse_y_sync1     <= mouse_y_raw;
-            mouse_left_sync1  <= mouse_left_raw;
-            mouse_right_sync1 <= mouse_right_raw;
+            if (mouse_event_65MHz) begin
+                mouse_x_sync1     <= mouse_x_raw;
+                mouse_y_sync1     <= mouse_y_raw;
+                mouse_left_sync1  <= mouse_left_raw;
+                mouse_right_sync1 <= mouse_right_raw;
+            end
             
-            // Stopień 2: Przekazuje w pełni stabilne dane dla reszty logiki gry
             mouse_x_sync2     <= mouse_x_sync1;
             mouse_y_sync2     <= mouse_y_sync1;
             mouse_left_sync2  <= mouse_left_sync1;
@@ -119,25 +112,51 @@ module top_vga
         .new_event  (mouse_new_event) 
     );
 
-    // LOGIKA GRY I SYGNAŁY STERUJĄCE
     logic [2:0]  current_state;
     logic [31:0] active_crates, active_loot, rx_active_crates, rx_active_loot, crates_hit_mask, loot_collected_mask;
     logic [15:0] my_world_x, my_world_y, enemy_world_x, enemy_world_y, my_bullet_x, my_bullet_y, enemy_bullet_x, enemy_bullet_y, player_next_x, player_next_y;
     logic [7:0]  my_hp, my_dmg, enemy_hp, my_bullet_dmg, rx_take_dmg_val;
     logic        my_dead, char_select_btn, my_bullet_active, enemy_bullet_active, rx_take_dmg_en, hit_enemy, hit_wall;
     logic [1:0]  class_id;
-    logic        apply_heal, apply_dmg_boost, apply_speed_boost, phase_timeout;
-    logic [13:0] map_addr_vga, map_addr_collision, map_addr_player;
+    logic        apply_heal, apply_dmg_boost, apply_speed_boost;
+    
+    // UTRZYMANO NA 12 BITACH DLA MAPY 64X64
+    logic [11:0] map_addr_vga, map_addr_collision, map_addr_player;
     logic        is_wall_vga, is_wall_collision, is_wall_player;
-    logic        mouse_lmb_pulse, mouse_rmb_pulse, rx_take_dmg_pulse; 
+    
+    logic        mouse_lmb_pulse, mouse_rmb_pulse, rx_take_dmg_pulse;
     logic        tx_start, tx_busy, rx_ready;
     logic [7:0]  tx_data, rx_data;
+
+    // Timer dla fazy ulepszeń
+    logic [9:0] timeout_counter;
+    logic       phase_timeout_pulse;
+
+    always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
+        if (!rst_sys_n) begin
+            timeout_counter <= 10'd0;
+            phase_timeout_pulse <= 1'b0;
+        end else begin
+            if (current_state == 3'd2 && logic_tick_60hz) begin
+                if (timeout_counter == 10'd600) begin 
+                    phase_timeout_pulse <= 1'b1;
+                end else begin
+                    timeout_counter <= timeout_counter + 1;
+                    phase_timeout_pulse <= 1'b0;
+                end
+            end else if (current_state != 3'd2) begin
+                timeout_counter <= 10'd0;
+                phase_timeout_pulse <= 1'b0;
+            end else begin
+                phase_timeout_pulse <= 1'b0;
+            end
+        end
+    end
 
     edge_detector u_lmb_edge (.clk(clk_65MHz), .rst_n(rst_sys_n), .in_signal(mouse_left_sync2), .out_pulse(mouse_lmb_pulse));
     edge_detector u_rmb_edge (.clk(clk_65MHz), .rst_n(rst_sys_n), .in_signal(mouse_right_sync2), .out_pulse(mouse_rmb_pulse));
     edge_detector u_dmg_edge (.clk(clk_65MHz), .rst_n(rst_sys_n), .in_signal(rx_take_dmg_en), .out_pulse(rx_take_dmg_pulse));
 
-    // INSTANCJE MODUŁÓW
     game_logic_top u_game_logic (
         .clk                 (clk_65MHz),
         .rst_n               (rst_sys_n),
@@ -149,14 +168,17 @@ module top_vga
         .current_state       (current_state),
         .start_btn           (mouse_lmb_pulse && (current_state == 3'd0 || current_state == 3'd4)),
         .char_select_btn     (char_select_btn),
-        .phase_timeout       (1'b0),
+        .phase_timeout       (phase_timeout_pulse),
         .crates_hit_mask     (crates_hit_mask),
         .loot_collected_mask (loot_collected_mask),
         .p1_dead             (my_dead),
         .p2_dead             (enemy_hp == 8'd0)
     );
 
-    player_ctl u_player_ctl (
+    player_ctl #(
+        .MAP_WIDTH_M(2048),
+        .MAP_HEIGHT_N(2048)
+    ) u_player_ctl (
         .clk               (clk_65MHz),
         .rst_n             (rst_sys_n),
         .mouse_x           (mouse_x_sync2),
@@ -180,7 +202,10 @@ module top_vga
         .is_dead           (my_dead)
     );
 
-    bullet_ctl u_bullet_ctl (
+    bullet_ctl #(
+        .MAP_WIDTH_M(2048),
+        .MAP_HEIGHT_N(2048)
+    ) u_bullet_ctl (
         .clk              (clk_65MHz),
         .rst_n            (rst_sys_n),
         .update_tick      (logic_tick_60hz),
@@ -284,22 +309,24 @@ module top_vga
         .rx_ready (rx_ready)
     );
 
+    // KOREKTA NA [10:5] - 12 BITÓW ADRESU (0-63)
+    assign map_addr_player = {player_next_y[10:5], player_next_x[10:5]};
+
     map_rom u_map_rom (
         .clk       (clk_65MHz),
-        .addr_a    (map_addr_vga[11:0]),
+        .addr_a    (map_addr_vga),
         .is_wall_a (is_wall_vga),
-        .addr_b    (map_addr_collision[11:0]),
+        .addr_b    (map_addr_collision),
         .is_wall_b (is_wall_collision)
     );
 
     map_rom u_map_rom_player (
         .clk       (clk_65MHz),
-        .addr_a    (map_addr_player[11:0]),
+        .addr_a    (map_addr_player),
         .is_wall_a (is_wall_player),
         .addr_b    (12'h0),
         .is_wall_b ()
     );
-    assign map_addr_player = {player_next_y[11:5], player_next_x[11:5]};
 
     vga_timing u_vga_timing (
         .clk    (clk_65MHz),
@@ -329,23 +356,22 @@ module top_vga
         .active_loot    (active_loot)
     );
 
-    // Aktualizacja instancji draw_entities - podpinamy pocisk wroga
     draw_entities u_draw_entities (
-        .clk             (clk_65MHz),
-        .rst_n           (rst_sys_n),
-        .in              (crates_to_entities.in),
-        .out             (entities_to_hud.out),
-        .cam_world_x     (my_world_x),
-        .cam_world_y     (my_world_y),
-        .enemy_world_x   (enemy_world_x),
-        .enemy_world_y   (enemy_world_y),
-        .enemy_hp        (enemy_hp),
-        .bullet_world_x  (my_bullet_x),
-        .bullet_world_y  (my_bullet_y),
-        .bullet_active   (my_bullet_active),
-        .enemy_bullet_x  (enemy_bullet_x),      // DODANE
-        .enemy_bullet_y  (enemy_bullet_y),      // DODANE
-        .enemy_bullet_active (enemy_bullet_active) // DODANE
+        .clk                 (clk_65MHz),
+        .rst_n               (rst_sys_n),
+        .in                  (crates_to_entities.in),
+        .out                 (entities_to_hud.out),
+        .cam_world_x         (my_world_x),
+        .cam_world_y         (my_world_y),
+        .enemy_world_x       (enemy_world_x),
+        .enemy_world_y       (enemy_world_y),
+        .enemy_hp            (enemy_hp),
+        .bullet_world_x      (my_bullet_x),
+        .bullet_world_y      (my_bullet_y),
+        .bullet_active       (my_bullet_active),
+        .enemy_bullet_x      (enemy_bullet_x),      
+        .enemy_bullet_y      (enemy_bullet_y),      
+        .enemy_bullet_active (enemy_bullet_active) 
     );
 
     draw_hud u_draw_hud (
@@ -389,4 +415,5 @@ module top_vga
         .xpos   (mouse_x_sync2),
         .ypos   (mouse_y_sync2)
     );
+
 endmodule

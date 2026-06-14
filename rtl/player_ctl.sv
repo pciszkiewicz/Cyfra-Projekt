@@ -1,8 +1,8 @@
 `timescale 1 ns / 1 ps
 
 module player_ctl #(
-    parameter int MAP_WIDTH_M = 4096,  
-    parameter int MAP_HEIGHT_N = 4096, 
+    parameter int MAP_WIDTH_M = 2048,  // Poprawione na wymiary 64x64
+    parameter int MAP_HEIGHT_N = 2048, // Poprawione na wymiary 64x64
     parameter int SCREEN_W = 1024,
     parameter int SCREEN_H = 768,
     parameter int PLAYER_SIZE = 32
@@ -21,13 +21,12 @@ module player_ctl #(
     input  logic        take_dmg_en,  
     input  logic [7:0]  take_dmg_val, 
     
-    // Looting - wejścia z detekcji
     input  logic        apply_heal,
     input  logic        apply_dmg_boost,
     input  logic        apply_speed_boost,
 
-    // Ściany - bezpieczne CDC z pamięci
     input  logic        is_wall_ahead,
+    
     output logic [15:0] next_x_out,
     output logic [15:0] next_y_out,
 
@@ -40,7 +39,8 @@ module player_ctl #(
 
     localparam int CENTER_X = SCREEN_W / 2;
     localparam int CENTER_Y = SCREEN_H / 2;
-    localparam int DEADZONE = 20; 
+    localparam int DEADZONE = 20;
+
     localparam int CENTER_X_L = CENTER_X - DEADZONE;
     localparam int CENTER_X_R = CENTER_X + DEADZONE;
     localparam int CENTER_Y_U = CENTER_Y - DEADZONE;
@@ -51,13 +51,12 @@ module player_ctl #(
     logic [3:0]  speed_reg;
 
     logic [15:0] req_x, req_y;
-    logic [1:0]  move_pending;
+    logic [2:0]  move_pending; // Rejestr 3-stopniowy dla BRAM
 
     logic [15:0] temp_x, temp_y;
     always_comb begin
         temp_x = world_x_reg;
         temp_y = world_y_reg;
-        
         if (mouse_x < CENTER_X_L && temp_x > speed_reg) temp_x = temp_x - speed_reg;
         else if (mouse_x > CENTER_X_R && temp_x < MAP_WIDTH_M - PLAYER_SIZE) temp_x = temp_x + speed_reg;
         
@@ -74,7 +73,7 @@ module player_ctl #(
             speed_reg   <= 4'd4;
             req_x       <= MAP_WIDTH_M / 2;
             req_y       <= MAP_HEIGHT_N / 2;
-            move_pending <= 2'b0;
+            move_pending <= 3'b0;
         end else begin
             if (load_stats) begin
                 case (char_class)
@@ -85,15 +84,13 @@ module player_ctl #(
                 endcase
                 world_x_reg <= MAP_WIDTH_M / 2;
                 world_y_reg <= MAP_HEIGHT_N / 2;
-                move_pending <= 2'b0;
+                move_pending <= 3'b0;
             end else begin
-                // Obrażenia
                 if (take_dmg_en && hp_reg > 0) begin
                     if (hp_reg >= take_dmg_val) hp_reg <= hp_reg - take_dmg_val;
                     else                        hp_reg <= 8'd0;
                 end
                 
-                // Ulepszenia (Looting)
                 if (apply_heal && hp_reg > 0) begin
                     if (hp_reg < 255 - 25) hp_reg <= hp_reg + 25;
                     else                   hp_reg <= 255;
@@ -101,8 +98,6 @@ module player_ctl #(
                 if (apply_dmg_boost) dmg_reg <= dmg_reg + 5;
                 if (apply_speed_boost && speed_reg < 15) speed_reg <= speed_reg + 1;
 
-                // Faza 1: Obliczenie wektora
-                // Faza 1: Obliczenie wektora
                 if (update_tick && hp_reg > 0 && mouse_rmb) begin
                     req_x <= temp_x;
                     req_y <= temp_y;
@@ -111,10 +106,11 @@ module player_ctl #(
                     move_pending[0] <= 1'b0;
                 end
                 
-                // Faza 2: Czekamy 1 takt na odpowiedź z BRAM i aplikujemy ruch
                 move_pending[1] <= move_pending[0];
-                if (move_pending[1]) begin
-                    if (!is_wall_ahead) begin
+                move_pending[2] <= move_pending[1]; // Trzeci stopień dający czas BRAMowi na odpowiedź
+                
+                if (move_pending[2]) begin
+                    if (!is_wall_ahead) begin 
                         world_x_reg <= req_x;
                         world_y_reg <= req_y;
                     end
