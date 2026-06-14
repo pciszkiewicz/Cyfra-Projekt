@@ -58,7 +58,9 @@ sv work ../../rtl/game_fsm.sv
 sv work ../../rtl/game_logic_top.sv
 
 # ==========================================
-# Moduły Topowe
+# Moduły Topowe i Pliki Symulacyjne
 # ==========================================
 sv work ../../rtl/top_vga.sv
-sv work ./top_vga_dual_tb.sv
+sv work ../common/tiff_writer.sv
+verilog work ../common/glbl.v
+sv work ./top_vga_epic_tb.sv

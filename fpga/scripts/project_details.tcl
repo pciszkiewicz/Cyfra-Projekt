@@ -43,7 +43,6 @@ set sv_files {
     ../rtl/crates_rom.sv
     ../rtl/map_rom.sv
     ../rtl/lfsr.sv
-    ../rtl/cam_translation.sv
     ../rtl/bullet_ctl.sv
     ../rtl/collision_det.sv
     ../rtl/crates_collision_det.sv

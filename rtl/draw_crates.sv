@@ -1,10 +1,4 @@
-/**
- * MTM UEC2
- * Author: Piotr Ciszkiewicz
- *
- * Description:
- * Crate and loot rendering module inserted into the VGA pipeline.
- */
+`timescale 1ns / 1ps
 
 module draw_crates (
     input  logic        clk,
@@ -17,90 +11,117 @@ module draw_crates (
     input  logic [31:0] active_loot
 );
 
-logic [15:0] crate_x [32];
-logic [15:0] crate_y [32];
+    logic signed [15:0] screen_x, screen_y;
 
-genvar i;
-generate
-    for (i = 0; i < 32; i = i + 1) begin : gen_crate_luts
-        crate_lut u_crate_lut (
-            .crate_id(i[4:0]),
-            .crate_x(crate_x[i]),
-            .crate_y(crate_y[i])
-        );
+    always_comb begin
+        screen_x = signed'({1'b0, in.hcount}) + signed'({1'b0, player_x}) - 16'sd512;
+        screen_y = signed'({1'b0, in.vcount}) + signed'({1'b0, player_y}) - 16'sd384;
     end
-endgenerate
 
-logic signed [12:0] map_pixel_x, map_pixel_y;
+    // Instancjacja 32 modułów LUT dla skrzynek (obliczane równolegle)
+    logic [15:0] crate_x [31:0];
+    logic [15:0] crate_y [31:0];
 
-always_comb begin
-    map_pixel_x = $signed({2'b0, in.hcount}) + $signed({1'b0, player_x}) - 13'sd512;
-    map_pixel_y = $signed({2'b0, in.vcount}) + $signed({1'b0, player_y}) - 13'sd384;
-end
+    genvar i;
+    generate
+        for (i = 0; i < 32; i++) begin : crate_luts
+            crate_lut u_lut (
+                .crate_id(i[4:0]),
+                .crate_x(crate_x[i]),
+                .crate_y(crate_y[i])
+            );
+        end
+    endgenerate
 
-logic signed [12:0] map_pixel_x_d1, map_pixel_y_d1;
-logic [10:0]        hcount_d1, vcount_d1;
-logic               hsync_d1, vsync_d1, hblnk_d1, vblnk_d1;
-logic [11:0]        rgb_d1;
+    // Kombinacyjna pętla sprawdzająca, czy bieżący piksel znajduje się wewnątrz jakiejkolwiek skrzynki
+    logic [4:0]  crate_id_out;
+    logic        crate_valid_out;
+    logic [15:0] diff_x, diff_y;
+    logic [9:0]  sprite_addr;
 
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        map_pixel_x_d1 <= '0; map_pixel_y_d1 <= '0;
-        hcount_d1      <= '0; vcount_d1      <= '0;
-        hsync_d1       <= '0; vsync_d1       <= '0;
-        hblnk_d1       <= '0; vblnk_d1       <= '0;
-        rgb_d1         <= '0;
-    end else begin
-        map_pixel_x_d1 <= map_pixel_x; map_pixel_y_d1 <= map_pixel_y;
-        hcount_d1      <= in.hcount;   vcount_d1      <= in.vcount;
-        hsync_d1       <= in.hsync;    vsync_d1       <= in.vsync;
-        hblnk_d1       <= in.hblnk;    vblnk_d1       <= in.vblnk;
-        rgb_d1         <= in.rgb;
-    end
-end
+    always_comb begin
+        crate_valid_out = 1'b0;
+        crate_id_out    = 5'd0;
+        diff_x          = 16'd0;
+        diff_y          = 16'd0;
 
-logic is_crate, is_loot;
-logic [11:0] rgb_nxt;
-logic signed [12:0] dx, dy;
-
-always_comb begin
-    is_crate = 1'b0;
-    is_loot  = 1'b0;
-    
-    for (int j = 0; j < 32; j = j + 1) begin
-        dx = map_pixel_x_d1 - $signed({1'b0, crate_x[j]});
-        dy = map_pixel_y_d1 - $signed({1'b0, crate_y[j]});
+        for (int j = 0; j < 32; j++) begin
+            // Rzutowanie na signed, by uniknąć błędów porównań dla wartości poza ekranem (ujemnych)
+            if (screen_x >= signed'({1'b0, crate_x[j]}) && screen_x < signed'({1'b0, crate_x[j]}) + 16'sd32 &&
+                screen_y >= signed'({1'b0, crate_y[j]}) && screen_y < signed'({1'b0, crate_y[j]}) + 16'sd32) begin
+                
+                crate_valid_out = 1'b1;
+                crate_id_out    = j[4:0];
+                diff_x          = screen_x - signed'({1'b0, crate_x[j]});
+                diff_y          = screen_y - signed'({1'b0, crate_y[j]});
+            end
+        end
         
-        if (dx[12:5] == 8'b0 && dy[12:5] == 8'b0) begin
-            if (active_crates[j]) begin
-                is_crate = 1'b1;
-            end else if (active_loot[j]) begin
-                if (dx >= 13'sd8 && dx < 13'sd24 && dy >= 13'sd8 && dy < 13'sd24) begin
-                    is_loot = 1'b1;
-                end
+        sprite_addr = {diff_y[4:0], diff_x[4:0]};
+    end
+
+    // Inicjalizacja tekstur ROM
+    (* rom_style = "block" *) logic [11:0] rom_crate [1023:0];
+    (* rom_style = "block" *) logic [11:0] rom_heal  [1023:0];
+    (* rom_style = "block" *) logic [11:0] rom_dmg   [1023:0];
+    (* rom_style = "block" *) logic [11:0] rom_speed [1023:0];
+
+    initial begin
+        $readmemh("../../rtl/memory/crate_sprite.mem", rom_crate);
+        $readmemh("../../rtl/memory/loot_heal.mem", rom_heal);
+        $readmemh("../../rtl/memory/loot_dmg.mem", rom_dmg);
+        $readmemh("../../rtl/memory/loot_speed.mem", rom_speed);
+    end
+
+    // Rejestry opóźniające dopasowane do pamięci ROM
+    logic [11:0] pix_crate, pix_heal, pix_dmg, pix_speed, rgb_d1;
+    logic        valid_d1;
+    logic [4:0]  id_d1;
+    logic        hsync_d1, vsync_d1, hblnk_d1, vblnk_d1;
+    logic [10:0] hcount_d1, vcount_d1;
+
+    always_ff @(posedge clk) begin
+        pix_crate <= rom_crate[sprite_addr];
+        pix_heal  <= rom_heal[sprite_addr];
+        pix_dmg   <= rom_dmg[sprite_addr];
+        pix_speed <= rom_speed[sprite_addr];
+        
+        valid_d1  <= crate_valid_out;
+        id_d1     <= crate_id_out;
+        rgb_d1    <= in.rgb;
+        hcount_d1 <= in.hcount; vcount_d1 <= in.vcount;
+        hsync_d1  <= in.hsync;  vsync_d1  <= in.vsync;
+        hblnk_d1  <= in.hblnk;  vblnk_d1  <= in.vblnk;
+    end
+
+    // Logika warstw i tekstur
+    logic [11:0] rgb_nxt;
+    always_comb begin
+        rgb_nxt = rgb_d1;
+        if (!vblnk_d1 && !hblnk_d1 && valid_d1) begin
+            if (active_crates[id_d1]) begin
+                if (pix_crate != 12'hF0F) rgb_nxt = pix_crate;
+            end else if (active_loot[id_d1]) begin
+                // Mechanika przydziału tekstury na podstawie ID (modulo 3)
+                if      (id_d1 % 3 == 0 && pix_heal  != 12'hF0F) rgb_nxt = pix_heal;
+                else if (id_d1 % 3 == 1 && pix_dmg   != 12'hF0F) rgb_nxt = pix_dmg;
+                else if (id_d1 % 3 == 2 && pix_speed != 12'hF0F) rgb_nxt = pix_speed;
             end
         end
     end
-
-    rgb_nxt = rgb_d1;
-    if (!vblnk_d1 && !hblnk_d1) begin
-        if (is_crate)      rgb_nxt = 12'h840; 
-        else if (is_loot)  rgb_nxt = 12'hFD0; 
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            out.hcount <= 0; out.vcount <= 0;
+            out.hsync  <= 0; out.vsync  <= 0;
+            out.hblnk  <= 0; out.vblnk  <= 0;
+            out.rgb    <= 0;
+        end else begin
+            out.hcount <= hcount_d1; out.vcount <= vcount_d1;
+            out.hsync  <= hsync_d1;  out.vsync  <= vsync_d1;
+            out.hblnk  <= hblnk_d1;  out.vblnk  <= vblnk_d1;
+            out.rgb    <= rgb_nxt;
+        end
     end
-end
-
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        out.vcount <= '0; out.hcount <= '0;
-        out.vsync  <= '0; out.hsync  <= '0;
-        out.vblnk  <= '0; out.hblnk  <= '0;
-        out.rgb    <= '0;
-    end else begin
-        out.vcount <= vcount_d1; out.hcount <= hcount_d1;
-        out.vsync  <= vsync_d1;  out.hsync  <= hsync_d1;
-        out.vblnk  <= vblnk_d1;  out.hblnk  <= hblnk_d1;
-        out.rgb    <= rgb_nxt;
-    end
-end
 
 endmodule
