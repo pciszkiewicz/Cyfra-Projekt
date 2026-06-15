@@ -80,4 +80,15 @@ set vhdl_files {
 set mem_files {
     ../rtl/memory/crates_data.mem
     ../rtl/memory/map_walls.mem
+    ../rtl/memory/bullet_blue.mem
+    ../rtl/memory/bullet_red.mem
+    ../rtl/memory/crate_sprite.mem
+    ../rtl/memory/crosshair.mem
+    ../rtl/memory/enemy_sprite.mem
+    ../rtl/memory/floor_sprite.mem
+    ../rtl/memory/loot_dmg.mem
+    ../rtl/memory/loot_heal.mem
+    ../rtl/memory/loot_speed.mem
+    ../rtl/memory/player_sprite.mem
+    ../rtl/memory/wall_sprite.mem
 }

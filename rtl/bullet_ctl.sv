@@ -5,11 +5,11 @@ module bullet_ctl #(
     parameter int MAP_HEIGHT_N = 4096,
     parameter int SCREEN_W     = 1024,
     parameter int SCREEN_H     = 768,
-    parameter int PLAYER_SIZE  = 32       
+    parameter int PLAYER_SIZE  = 32        
 )(
     input  logic        clk,
-    input  logic        rst_n,           
-    input  logic        update_tick,     
+    input  logic        rst_n,            
+    input  logic        update_tick,      
     input  logic [11:0] mouse_x,
     input  logic [11:0] mouse_y,
     input  logic        mouse_lmb,
@@ -25,7 +25,7 @@ module bullet_ctl #(
     output logic [15:0] bullet_world_x,
     output logic [15:0] bullet_world_y,
     output logic        bullet_active,
-    output logic [7:0]  bullet_dmg       
+    output logic [7:0]  bullet_dmg        
 );
 
     localparam int CENTER_X = SCREEN_W / 2;
@@ -74,6 +74,7 @@ module bullet_ctl #(
         vy_nxt         = vy_reg;
         bullet_dmg_nxt = bullet_dmg_reg;
         
+        // Zmniejszanie cooldownu niezależnie od stanu pocisku
         if (cooldown_reg > 0 && update_tick) cooldown_nxt = cooldown_reg - 1;
         else                                 cooldown_nxt = cooldown_reg;
 
@@ -83,9 +84,7 @@ module bullet_ctl #(
         abs_dx = (dx < 0) ? -dx : dx;
         abs_dy = (dy < 0) ? -dy : dy;
 
-        // Sprzętowa aproksymacja normalizacji wektora (bez użycia dzielnika z biblioteki DSP).
-        // Szukamy osi o największym odchyleniu i na jej podstawie dobieramy stałą dzielenia (shift_val), 
-        // co działa jak dzielenie wektora przez potęgi dwójki. Wyrównuje to prędkość lotu pocisku.
+        // Sprzętowa aproksymacja normalizacji wektora
         if (abs_dx > abs_dy) begin
             if      (abs_dx > 512) shift_val = 4'd6; 
             else if (abs_dx > 256) shift_val = 4'd5; 
@@ -100,41 +99,38 @@ module bullet_ctl #(
             else                   shift_val = 4'd2;
         end
 
-        // Operacja >>> to przesunięcie arytmetyczne, które w odróżnieniu od logicznego (>>)
-        // zachowuje bit znaku, dzięki czemu pocisk poprawnie poleci też w lewo/górę (ujemne wektory).
+        // Zachowanie bitu znaku przy przesunięciu
         calc_vx = signed'(dx >>> shift_val);
         calc_vy = signed'(dy >>> shift_val);
 
-        if (!active_reg) begin
-            if (mouse_lmb && phase_combat && cooldown_reg == 0) begin
-                active_nxt     = 1'b1;
-                
-                // Zatrzaskujemy obrażenia w rejestrze pocisku w momencie kliknięcia.
-                // Pocisk staje się niezależnym bytem i ewentualne modyfikatory mocy gracza 
-                // zebrane po wystrzale nie zmienią w locie zadawanych przez niego obrażeń.
-                bullet_dmg_nxt = player_dmg; 
-                
-                // Wyśrodkowanie spawnu pocisku na środek sprite'a gracza
-                bullet_x_nxt = player_world_x + (PLAYER_SIZE / 2);
-                bullet_y_nxt = player_world_y + (PLAYER_SIZE / 2);
-                
-                if (calc_vx == 0 && calc_vy == 0) begin
-                    vx_nxt = 8'd10; 
-                    vy_nxt = 8'd0;
-                end else begin
-                    vx_nxt = calc_vx;
-                    vy_nxt = calc_vy;
-                end
+        // ZMIENIONA LOGIKA WYSZUKIWANIA I LOTU POCISKU:
+        // Brak ograniczenia (!active_reg) - kliknięcie przy wyzerowanym cooldownie
+        if (mouse_lmb && phase_combat && cooldown_reg == 0) begin
+            active_nxt     = 1'b1;
+            bullet_dmg_nxt = player_dmg; 
+            
+            cooldown_nxt   = 6'd42; // Cooldown ustawiany bezpośrednio w momencie wystrzału (0,7s)
+            
+            bullet_x_nxt = player_world_x + (PLAYER_SIZE / 2);
+            bullet_y_nxt = player_world_y + (PLAYER_SIZE / 2);
+            
+            if (calc_vx == 0 && calc_vy == 0) begin
+                vx_nxt = 8'd10; 
+                vy_nxt = 8'd0;
+            end else begin
+                vx_nxt = calc_vx;
+                vy_nxt = calc_vy;
             end
-        end else begin
+        end else if (active_reg) begin
+            // Obsługa lotu, gdy pocisk jest aktywny, ale w tej klatce nie padł nowy strzał
             if (update_tick) begin
                 bullet_x_nxt = unsigned'(signed'({1'b0, bullet_x_reg}) + vx_reg);
                 bullet_y_nxt = unsigned'(signed'({1'b0, bullet_y_reg}) + vy_reg);
             end
 
+            // Kolizje i zniszczenie pocisku
             if (hit_wall || hit_enemy || bullet_x_reg > MAP_WIDTH_M || bullet_y_reg > MAP_HEIGHT_N) begin
                 active_nxt   = 1'b0;
-                cooldown_nxt = 6'd15; 
             end
         end
     end
