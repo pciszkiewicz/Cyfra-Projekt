@@ -60,23 +60,28 @@ module player_ctl #(
     always_comb begin
         temp_x = world_x_reg;
         temp_y = world_y_reg;
-        if (mouse_x < CENTER_X_L && temp_x > speed_reg) temp_x = temp_x - speed_reg;
-        else if (mouse_x > CENTER_X_R && temp_x < MAP_WIDTH_M - PLAYER_SIZE) temp_x = temp_x + speed_reg;
         
-        if (mouse_y < CENTER_Y_U && temp_y > speed_reg) temp_y = temp_y - speed_reg;
-        else if (mouse_y > CENTER_Y_D && temp_y < MAP_HEIGHT_N - PLAYER_SIZE) temp_y = temp_y + speed_reg;
+        if (mouse_x < CENTER_X_L && temp_x > speed_reg) 
+            temp_x = temp_x - speed_reg;
+        else if (mouse_x > CENTER_X_R && (temp_x + speed_reg) <= (MAP_WIDTH_M - PLAYER_SIZE)) 
+            temp_x = temp_x + speed_reg;
+        
+        if (mouse_y < CENTER_Y_U && temp_y > speed_reg) 
+            temp_y = temp_y - speed_reg;
+        else if (mouse_y > CENTER_Y_D && (temp_y + speed_reg) <= (MAP_HEIGHT_N - PLAYER_SIZE)) 
+            temp_y = temp_y + speed_reg;
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            // Zależność punktu odrodzenia od przełącznika is_master
-            world_x_reg <= is_master ? 16'd128 : 16'd1888;
-            world_y_reg <= is_master ? 16'd128 : 16'd1888;
-            hp_reg      <= 8'd100;
-            dmg_reg     <= 8'd25;
-            speed_reg   <= 4'd4;
-            req_x       <= is_master ? 16'd128 : 16'd1888;
-            req_y       <= is_master ? 16'd128 : 16'd1888;
+            // POPRAWKA: Zwykły reset do zera, bez logiki warunkowej (usuwa latche z Vivado)
+            world_x_reg  <= 16'd0;
+            world_y_reg  <= 16'd0;
+            hp_reg       <= 8'd100;
+            dmg_reg      <= 8'd25;
+            speed_reg    <= 4'd4;
+            req_x        <= 16'd0;
+            req_y        <= 16'd0;
             move_pending <= 3'b0;
         end else begin
             if (load_stats) begin
@@ -87,8 +92,8 @@ module player_ctl #(
                     2'b11: begin hp_reg <= 8'd50;  speed_reg <= 4'd3; dmg_reg <= 8'd50; end 
                 endcase
                 // Zależność punktu odrodzenia przy starcie nowej gry
-                world_x_reg <= is_master ? 16'd128 : 16'd1888;
-                world_y_reg <= is_master ? 16'd128 : 16'd1888;
+                world_x_reg  <= is_master ? 16'd128 : 16'd1888;
+                world_y_reg  <= is_master ? 16'd128 : 16'd1888;
                 move_pending <= 3'b0;
             end else begin
                 if (take_dmg_en && hp_reg > 0) begin
