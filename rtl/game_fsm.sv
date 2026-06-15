@@ -1,26 +1,27 @@
 `timescale 1 ns / 1 ps
 
 module game_fsm (
-    input  logic        clk,
-    input  logic        rst_n,
-    input  logic        is_master,
-    input  logic [31:0] rx_active_crates,
-    input  logic [31:0] rx_active_loot,
-    output logic [7:0]  rom_addr,
+    input logic clk,
+    input logic rst_n,
+    output logic [7:0] rom_addr,
     output logic [31:0] active_crates,
     output logic [31:0] active_loot,
-    output logic [2:0]  current_state,
-    input  logic        start_btn,
-    input  logic        char_select_btn,
-    input  logic        phase_timeout,
-    input  logic [7:0]  lfsr_val,
-    input  logic [31:0] rom_data,
-    input  logic [31:0] crates_hit_mask,
-    input  logic [31:0] loot_collected_mask,
-    input  logic        p1_dead,
-    input  logic        p2_dead
+    output logic [2:0] current_state,
+    input logic is_master,
+    input logic [31:0] rx_active_crates,
+    input logic [31:0] rx_active_loot,
+    input logic start_btn,
+    input logic char_select_btn,
+    input logic phase_timeout,
+    input logic [7:0] lfsr_val,
+    input logic [31:0] rom_data,
+    input logic [31:0] crates_hit_mask,
+    input logic [31:0] loot_collected_mask,
+    input logic p1_dead,
+    input logic p2_dead
 );
 
+/* User defined types and constants */
 typedef enum logic [2:0] {
     ST_INIT        = 3'd0,
     ST_CHAR_SELECT = 3'd1,
@@ -29,77 +30,89 @@ typedef enum logic [2:0] {
     ST_END         = 3'd4
 } state_t;
 
-state_t state;
-state_t state_nxt;
+/* Local variables and signals */
+state_t state_reg, state_nxt;
 
 logic [31:0] active_crates_reg, active_crates_nxt;
 logic [31:0] active_loot_reg, active_loot_nxt;
 logic [31:0] newly_destroyed_crates;
 
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        state             <= ST_INIT;
-        active_crates_reg <= 32'h0;
-        active_loot_reg   <= 32'h0;
-    end else begin
-        state             <= state_nxt;
-        active_crates_reg <= active_crates_nxt;
-        active_loot_reg   <= active_loot_nxt;
-    end
-end
+/* Signals assignments */
+assign current_state = state_reg;
+assign active_crates = active_crates_reg;
+assign active_loot = active_loot_reg;
+assign rom_addr = lfsr_val;
 
+/* Module internal logic */
 always_comb begin
-    state_nxt              = state;
-    active_crates_nxt      = active_crates_reg;
-    active_loot_nxt        = active_loot_reg;
-    rom_addr               = lfsr_val;
+    state_nxt = state_reg;
+    active_crates_nxt = active_crates_reg;
+    active_loot_nxt = active_loot_reg;
+    
     newly_destroyed_crates = active_crates_reg & crates_hit_mask;
 
-    case (state)
+    case (state_reg)
         ST_INIT: begin
-            if (start_btn) state_nxt = ST_CHAR_SELECT;
+            if (start_btn) begin
+                state_nxt = ST_CHAR_SELECT;
+            end
         end
 
         ST_CHAR_SELECT: begin
-            if(char_select_btn) begin
+            if (char_select_btn) begin
                 state_nxt = ST_LOOTING;
+                
                 if (is_master) begin
                     active_crates_nxt = rom_data;
-                    active_loot_nxt   = 32'h0;
+                    active_loot_nxt = 32'h0;
                 end
             end
         end
         
         ST_LOOTING: begin
             if (is_master) begin
-                active_crates_nxt = active_crates_reg & ~crates_hit_mask;
-                active_loot_nxt = (active_loot_reg | newly_destroyed_crates) & ~loot_collected_mask;
+                active_crates_nxt = active_crates_reg & (~crates_hit_mask);
+                active_loot_nxt = (active_loot_reg | newly_destroyed_crates) & (~loot_collected_mask);
             end else begin
                 active_crates_nxt = rx_active_crates;
-                active_loot_nxt   = rx_active_loot;
+                active_loot_nxt = rx_active_loot;
             end
             
             if (phase_timeout) begin
-                state_nxt         = ST_COMBAT;
+                state_nxt = ST_COMBAT;
                 active_crates_nxt = 32'h0;
-                active_loot_nxt   = 32'h0;
+                active_loot_nxt = 32'h0;
             end
         end
         
         ST_COMBAT: begin
-            if (p1_dead || p2_dead) state_nxt = ST_END;
+            if (p1_dead || p2_dead) begin
+                state_nxt = ST_END;
+            end
         end
         
         ST_END: begin
-            if (start_btn) state_nxt = ST_INIT;
+            if (start_btn) begin
+                state_nxt = ST_INIT;
+            end
         end
         
-        default: state_nxt = ST_INIT;
+        default: begin
+            state_nxt = ST_INIT;
+        end
     endcase
 end
 
-assign current_state = state;
-assign active_crates = active_crates_reg;
-assign active_loot   = active_loot_reg;
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        state_reg <= ST_INIT;
+        active_crates_reg <= 32'h0;
+        active_loot_reg <= 32'h0;
+    end else begin
+        state_reg <= state_nxt;
+        active_crates_reg <= active_crates_nxt;
+        active_loot_reg <= active_loot_nxt;
+    end
+end
 
 endmodule

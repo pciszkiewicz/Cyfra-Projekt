@@ -1,24 +1,31 @@
 `timescale 1 ns / 1 ps
 
 module edge_detector (
-    input  logic clk,
-    input  logic rst_n,       // Reset asynchroniczny
-    input  logic in_signal,
-    output logic out_pulse
+    input logic clk,
+    input logic rst_n,
+    output logic out_pulse,
+    input logic in_signal
 );
 
-    logic in_signal_delayed;
+/* Local variables and signals */
+logic in_signal_d1_reg, in_signal_d1_nxt;
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            in_signal_delayed <= 1'b0;
-        end else begin
-            in_signal_delayed <= in_signal;
-        end
+/* Signals assignments */
+/* Wyrzucamy jedynke tylko w takcie, w ktorym sygnal wszedl w stan wysoki,
+   a w poprzednim takcie byl jeszcze w stanie niskim. */
+assign out_pulse = in_signal & (~in_signal_d1_reg);
+
+/* Module internal logic */
+always_comb begin
+    in_signal_d1_nxt = in_signal;
+end
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        in_signal_d1_reg <= 1'b0;
+    end else begin
+        in_signal_d1_reg <= in_signal_d1_nxt;
     end
-
-    // Wyrzucamy jedynkę tylko w takcie, w którym sygnał wszedł w stan wysoki,
-    // a w poprzednim takcie był jeszcze w stanie niskim.
-    assign out_pulse = in_signal & ~in_signal_delayed;
+end
 
 endmodule

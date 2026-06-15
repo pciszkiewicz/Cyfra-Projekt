@@ -120,7 +120,8 @@ module top_vga_epic_tb;
 
         // Wymuszamy stan maszyny na fazę walki
         force uut.current_state = 3'd3;
-        force uut.u_game_logic.u_game_fsm.state = 3'd3;
+        // Zmiana: "state" na "state_reg" z game_fsm
+        force uut.u_game_logic.u_game_fsm.state_reg = 3'd3;
 
         // --- Gracz 1 (Ty) ---
         // Ustawiłem pozycję blisko środka (skrzynki LUT 16),
@@ -156,8 +157,9 @@ module top_vga_epic_tb;
         // --- Celownik Myszy ---
         // Ty stoisz na 950, a gracz to zawsze środek ekranu (x=512), 
         // to punkt wroga x=1100 będzie widoczny na 512+(1100-950) = 662.
-        force uut.mouse_x_sync2 = 12'd662;
-        force uut.mouse_y_sync2 = 12'd384; 
+        // Zmiana: mouse_x_sync2 na mouse_x_sync2_reg
+        force uut.mouse_x_sync2_reg = 12'd662;
+        force uut.mouse_y_sync2_reg = 12'd384; 
         
         // Dajemy chwilkę by sygnały "force" przesiąknęły przez sprzęt
         #1000;
