@@ -298,4 +298,17 @@ set_property PACKAGE_PIN B17 [get_ports PS2Data]
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property CFGBVS VCCO [current_design]
 
-set_max_delay -datapath_only -from [all_registers] -to [get_cells -hierarchical -filter {NAME =~ *mouse_*_sync1_reg*}] 15.0
+# ------------------------------------------------------------------------
+# CUSTOM TIMING CONSTRAINTS (Cyfra Projekt)
+# ------------------------------------------------------------------------
+
+# 1. Ignorowanie timingu dla fizycznych, asynchronicznych wejść z zewnątrz.
+# Wymieniamy tylko FAKTYCZNE wejścia, z pominięciem zegara (clk) i wyjść (VGA, JA2 - UART TX).
+# Celujemy dokładnie w pin wejściowy danych (D) pierwszego przerzutnika synchronizatora, 
+# aby uniknąć ostrzeżeń o układach kombinacyjnych.
+set_false_path -from [get_ports {sw0 btnC JA1 PS2Clk PS2Data}] -to [get_pins -hierarchical -filter {NAME =~ *sync1_reg*/D}]
+
+# 2. Poluzowanie timingu dla sygnałów przechodzących między różnymi domenami zegarowymi (CDC)
+# Flaga -datapath_only wymaga podania konkretnego czasu (15.0 ns dla 65 MHz).
+# Tutaj również celujemy precyzyjnie w pin D przerzutników synchronizujących.
+set_max_delay -datapath_only -from [all_registers] -to [get_pins -hierarchical -filter {NAME =~ *sync1_reg*/D}] 15.0

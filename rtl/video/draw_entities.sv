@@ -36,10 +36,10 @@ logic [9:0] addr_p, addr_e;
 logic [5:0] addr_b, addr_eb;
 
 /* Zmienne pomocnicze do obliczania relatywnej pozycji */
-logic [15:0] diff_p_x, diff_p_y;
-logic [15:0] diff_e_x, diff_e_y;
-logic [15:0] diff_b_x, diff_b_y;
-logic [15:0] diff_eb_x, diff_eb_y;
+logic [4:0] diff_p_x, diff_p_y;
+logic [4:0] diff_e_x, diff_e_y;
+logic [2:0] diff_b_x, diff_b_y;
+logic [2:0] diff_eb_x, diff_eb_y;
 
 (* rom_style = "block" *) logic [11:0] rom_p [1024];
 (* rom_style = "block" *) logic [11:0] rom_e [1024];

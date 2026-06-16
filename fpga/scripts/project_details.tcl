@@ -73,7 +73,6 @@ set verilog_files {
 set vhdl_files {
     ../rtl/io/MouseCtl.vhd
     ../rtl/io/Ps2Interface.vhd
-    ../rtl/video/MouseDisplay.vhd
 }
 
 # Pliki inicjalizacji pamięci ROM
