@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Kontroler pakietów sieciowych UART (Protokół Multiplayer).
+ * Agreguje pozycje, punkty zdrowia, stan pocisków oraz stan masek skrzyń/łupu.
+ * Formuje wielobajtowe ramki sieciowe i odpowiada za synchronizację rozgrywki p2p.
+ */
+
 module uart_packet_ctl (
     input logic clk,
     input logic rst_n,

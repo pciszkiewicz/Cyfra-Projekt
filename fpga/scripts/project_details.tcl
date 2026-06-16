@@ -35,31 +35,31 @@ set xdc_files {
 # Pliki SystemVerilog - logika gry i potok VGA
 # vga_pkg.sv musi być pierwszy ze względu na importy!
 set sv_files {
-    ../rtl/vga_pkg.sv
-    ../rtl/vga_if.sv
-    ../rtl/vga_timing.sv
-    ../rtl/edge_detector.sv
-    ../rtl/crate_lut.sv
-    ../rtl/crates_rom.sv
-    ../rtl/map_rom.sv
-    ../rtl/lfsr.sv
-    ../rtl/bullet_ctl.sv
-    ../rtl/collision_det.sv
-    ../rtl/crates_collision_det.sv
-    ../rtl/uart_tx.sv
-    ../rtl/uart_rx.sv
-    ../rtl/uart_packet_ctl.sv
-    ../rtl/draw_start_screen.sv
-    ../rtl/draw_char_select.sv
-    ../rtl/draw_map.sv
-    ../rtl/draw_crates.sv
-    ../rtl/draw_entities.sv
-    ../rtl/draw_hud.sv
-    ../rtl/draw_mouse.sv
-    ../rtl/player_ctl.sv
-    ../rtl/game_fsm.sv
-    ../rtl/game_logic_top.sv
-    ../rtl/top_vga.sv
+    ../rtl/video/vga_pkg.sv
+    ../rtl/video/vga_if.sv
+    ../rtl/video/vga_timing.sv
+    ../rtl/utils/edge_detector.sv
+    ../rtl/memory_ctrl/crate_lut.sv
+    ../rtl/memory_ctrl/crates_rom.sv
+    ../rtl/memory_ctrl/map_rom.sv
+    ../rtl/utils/lfsr.sv
+    ../rtl/game/bullet_ctl.sv
+    ../rtl/game/collision_det.sv
+    ../rtl/game/crates_collision_det.sv
+    ../rtl/io/uart_tx.sv
+    ../rtl/io/uart_rx.sv
+    ../rtl/io/uart_packet_ctl.sv
+    ../rtl/video/draw_start_screen.sv
+    ../rtl/video/draw_char_select.sv
+    ../rtl/video/draw_map.sv
+    ../rtl/video/draw_crates.sv
+    ../rtl/video/draw_entities.sv
+    ../rtl/video/draw_hud.sv
+    ../rtl/video/draw_mouse.sv
+    ../rtl/game/player_ctl.sv
+    ../rtl/game/game_fsm.sv
+    ../rtl/game/game_logic_top.sv
+    ../rtl/top/top_vga.sv
     rtl/top_vga_basys3.sv
 }
 
@@ -71,9 +71,9 @@ set verilog_files {
 
 # Pliki VHDL - Kontrolery myszy i interfejs PS/2
 set vhdl_files {
-    ../rtl/MouseCtl.vhd
-    ../rtl/Ps2Interface.vhd
-    ../rtl/MouseDisplay.vhd
+    ../rtl/io/MouseCtl.vhd
+    ../rtl/io/Ps2Interface.vhd
+    ../rtl/video/MouseDisplay.vhd
 }
 
 # Pliki inicjalizacji pamięci ROM

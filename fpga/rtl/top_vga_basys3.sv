@@ -1,9 +1,18 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Główny plik dla układu FPGA (Basys3 Hardware Top Module).
+ * Mapuje fizyczne piny płytki Vivado (przyciski, przełączniki, porty VGA, piny Pmod)
+ * na wewnętrzne sygnały logiczne systemu. Zawiera synchronizatory resetu i sygnałów wejściowych.
+ */
+
 module top_vga_basys3 (
     input logic clk,
     input logic btnC,
-    input logic btnU,
     input logic sw0,
     inout wire PS2Clk,
     inout wire PS2Data,
@@ -24,7 +33,6 @@ logic clk_locked;
 logic rst_sys_n_sync1_reg, rst_sys_n_sync2_reg;
 logic rst_100m_n_sync1_reg, rst_100m_n_sync2_reg;
 
-logic btnu_sync1_reg, btnu_sync2_reg;
 logic sw0_sync1_reg, sw0_sync2_reg;
 
 logic async_rst_n;
@@ -64,13 +72,9 @@ end
 /* Input synchronization */
 always_ff @(posedge clk_65MHz or negedge rst_sys_n_sync2_reg) begin
     if (!rst_sys_n_sync2_reg) begin
-        btnu_sync1_reg <= 1'b0;
-        btnu_sync2_reg <= 1'b0;
         sw0_sync1_reg <= 1'b0;
         sw0_sync2_reg <= 1'b0;
     end else begin
-        btnu_sync1_reg <= btnU;
-        btnu_sync2_reg <= btnu_sync1_reg;
         sw0_sync1_reg <= sw0;
         sw0_sync2_reg <= sw0_sync1_reg;
     end

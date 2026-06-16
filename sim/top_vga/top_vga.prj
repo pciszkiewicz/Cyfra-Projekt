@@ -1,0 +1,59 @@
+# VHDL: Interfejs i Mysz PS/2
+
+vhdl work ../../rtl/io/MouseCtl.vhd
+vhdl work ../../rtl/io/Ps2Interface.vhd
+
+# SYSTEMVERILOG: Pakiety i Interfejsy
+
+sv work ../../rtl/video/vga_pkg.sv
+sv work ../../rtl/video/vga_if.sv
+
+# Zegar, Timing
+
+sv work ../../rtl/video/vga_timing.sv
+
+# Pamięci i Obiekty (Pola BRAM/ROM)
+
+sv work ../../rtl/memory_ctrl/map_rom.sv
+sv work ../../rtl/memory_ctrl/crate_lut.sv
+sv work ../../rtl/memory_ctrl/crates_rom.sv
+
+# Rendering (Pipelines rysowania VGA)
+
+sv work ../../rtl/video/draw_map.sv
+sv work ../../rtl/video/draw_crates.sv
+sv work ../../rtl/video/draw_entities.sv
+sv work ../../rtl/video/draw_hud.sv
+sv work ../../rtl/video/draw_start_screen.sv
+sv work ../../rtl/video/draw_char_select.sv
+sv work ../../rtl/video/draw_mouse.sv
+
+# Logika Ruchu, Postaci i Walki
+
+sv work ../../rtl/utils/edge_detector.sv
+sv work ../../rtl/game/player_ctl.sv
+sv work ../../rtl/game/bullet_ctl.sv
+sv work ../../rtl/game/collision_det.sv
+sv work ../../rtl/game/crates_collision_det.sv
+
+# Komunikacja UART (Multiplayer)
+
+sv work ../../rtl/io/uart_tx.sv
+sv work ../../rtl/io/uart_rx.sv
+sv work ../../rtl/io/uart_packet_ctl.sv
+
+# Maszyna Stanów (Game Logic) i LFSR
+
+sv work ../../rtl/utils/lfsr.sv
+sv work ../../rtl/game/game_fsm.sv
+sv work ../../rtl/game/game_logic_top.sv
+
+# Moduły Topowe i Pliki Symulacyjne
+
+sv work ../../rtl/top/top_vga.sv
+sv work ../common/tiff_writer.sv
+verilog work ../common/glbl.v
+sv work ../../fpga/rtl/top_vga_basys3.sv
+verilog work ../../fpga/rtl/clk_wiz_0.v
+verilog work ../../fpga/rtl/clk_wiz_0_clk_wiz.v
+sv work ./top_vga_tb.sv

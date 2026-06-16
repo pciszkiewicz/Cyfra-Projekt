@@ -1,6 +1,16 @@
 `timescale 1ns / 1ps
 
-module top_vga_epic_tb;
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Zaawansowane środowisko weryfikacyjne (Testbench) dla całego systemu.
+ * Emuluje generowanie zegarów, steruje wymuszeniami sygnałów (force) dla stanów gry,
+ * oraz integruje moduł tiff_writer do zrzucania klatek wideo z menu, wyboru postaci i walki.
+ */
+
+module top_vga_tb;
 
     // -------------------------------------------------------------
     // Zegary i sygnały sterujące
@@ -22,7 +32,7 @@ module top_vga_epic_tb;
     logic uart_tx;
 
     // -------------------------------------------------------------
-    // INSTANCJA TWOJEGO TOPA (Gra)
+    // INSTANCJA MODUŁU TOP
     // -------------------------------------------------------------
     top_vga uut (
         .clk_65MHz(clk_65MHz),
@@ -42,7 +52,7 @@ module top_vga_epic_tb;
     );
 
     // -------------------------------------------------------------
-    // SPRZĘGŁO Z TIFF_WRITER (Synchronizacja obrazu)
+    // (Synchronizacja obrazu) TIFF_WRITER
     // -------------------------------------------------------------
     wire vde = ~uut.mouse_to_out.vblnk && ~uut.mouse_to_out.hblnk;
     
@@ -92,10 +102,10 @@ module top_vga_epic_tb;
     endtask
 
     // -------------------------------------------------------------
-    // SCENARIUSZ SYMULACJI "EPICKA SCENA"
+    // SCENARIUSZ SYMULACJI "SCENA WALKI"
     // -------------------------------------------------------------
     initial begin
-        $display("--- Start epickiej symulacji ---");
+        $display("--- Start symulacji ---");
         // Resetowanie systemu
         rst_sys_n  = 0;
         rst_100m_n = 0;
@@ -113,10 +123,29 @@ module top_vga_epic_tb;
         capture_frame();
         #1000;
 
-
-        // --- USTAWIANIE SCENY 2: WALKA ---
+        // --- ZDJĘCIE 2: EKRAN WYBORU POSTACI ---
         $display("--------------------------------");
-        $display("Budowanie epickiej sceny (ST_COMBAT)...");
+        $display("Scena 2: Ekran wyboru postaci (ST_CHAR_SELECT)");
+        
+        // Wymuszamy stan maszyny na wybór postaci (ST_CHAR_SELECT = 3'd1)
+        force uut.current_state = 3'd1;
+        force uut.u_game_logic.u_game_fsm.state_reg = 3'd1;
+        
+        // Ustawiamy myszkę na środku drugiego przycisku (klasa 1), 
+        // żeby aktywować hover i wyświetlić paski statystyk
+        force uut.mouse_x_sync2_reg = 12'd411; // B1_X (336) + połowa szerokości (75)
+        force uut.mouse_y_sync2_reg = 12'd575; // BTN_Y (500) + połowa wysokości (75)
+        
+        // Czekamy chwilkę na odświeżenie kombincayjne i rejestry
+        #1000; 
+        
+        capture_frame();
+        #1000;
+
+
+        // --- USTAWIANIE SCENY 3: WALKA ---
+        $display("--------------------------------");
+        $display("Budowanie sceny (ST_COMBAT)...");
 
         // Wymuszamy stan maszyny na fazę walki
         force uut.current_state = 3'd3;
@@ -164,8 +193,8 @@ module top_vga_epic_tb;
         // Dajemy chwilkę by sygnały "force" przesiąknęły przez sprzęt
         #1000;
         
-        // --- ZDJĘCIE 2: WALKA ---
-        $display("Scena 2: Rzeź niewiniątek w ST_COMBAT");
+        // --- ZDJĘCIE 3: WALKA ---
+        $display("Scena 3: Walka w ST_COMBAT");
         capture_frame();
         #1000;
 

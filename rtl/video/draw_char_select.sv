@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Ekran wyboru klasy postaci (Character Selection Screen).
+ * Odpowiada za wizualizację kafelków klas, obsługę podświetlenia (hover)
+ * oraz dynamiczne rysowanie pasków statystyk (HP, Speed, DMG) wybranej postaci.
+ */
+
 module draw_char_select (
     input logic clk,
     input logic rst_n,

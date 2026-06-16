@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Kontroler pocisków (Projectile Weapon Subsystem).
+ * Odpowiada za mechanikę strzelania, wyliczanie wektorów prędkości pocisku (shifter-based),
+ * odliczanie czasu przeładowania (cooldown) oraz aktualizację pozycji pocisku w świecie.
+ */
+
 module bullet_ctl #(
     parameter int MAP_WIDTH_M = 4096,
     parameter int MAP_HEIGHT_N = 4096,

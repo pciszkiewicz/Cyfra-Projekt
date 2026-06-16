@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Renderer postaci (Gracz, Przeciwnik) oraz pocisków w locie.
+ * Wykorzystuje pamięci ROM sprajtów graczy oraz pocisków sieciowych.
+ * Implementuje kluczowanie kolorem (Chroma Keying - kolor F0F jako przezroczysty).
+ */
+
 module draw_entities (
     input logic clk,
     input logic rst_n,

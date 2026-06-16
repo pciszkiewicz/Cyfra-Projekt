@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Top-level podsystemu logiki gry.
+ * Spina maszynę stanów FSM, generator pseudolosowy LFSR do dystrybucji skrzyń
+ * oraz pamięć ROM konfiguracji aren (układu obiektów na mapie).
+ */
+
 module game_logic_top (
     input logic clk,
     input logic rst_n,

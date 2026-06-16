@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Moduł renderujący ekran startowy (menu główne) gry.
+ * Zawiera zakodowaną wektorowo geometrię logo UEC2 oraz przycisku START
+ * reagującego zmianą koloru na pozycję kursora myszy (efekt hover).
+ */
+
 module draw_start_screen (
     input logic clk,
     input logic rst_n,

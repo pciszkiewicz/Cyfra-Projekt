@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Uniwersalny nadajnik UART (Transmitter).
+ * Przekształca 8-bitowe dane równoległe na szeregowy strumień bitów bit-by-bit
+ * z uwzględnieniem bitu startu oraz stopu przy wybranym baudrate.
+ */
+
 module uart_tx #(
     parameter int CLK_FREQ = 65_000_000, 
     parameter int BAUD_RATE = 115200

@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Jednostka sterowania i obsługi stanu gracza (Player Controller).
+ * Odpowiada za inicjalizację statystyk na bazie wybranej klasy, ruch postaci 
+ * względem pozycji myszy (strefa deadzone), aplikowanie bonusów oraz rejestrację obrażeń.
+ */
+
 module player_ctl #(
     parameter int MAP_WIDTH_M = 2048,
     parameter int MAP_HEIGHT_N = 2048,

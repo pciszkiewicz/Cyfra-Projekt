@@ -2,11 +2,14 @@
 
 /*
  * MTM UEC2
- * Author: Piotr Ciszkiewicz
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
  *
  * Description:
- * SystemVerilog interface for VGA signals pipeline.
+ * Interfejs magistrali wideo SystemVerilog (VGA Interface).
+ * Standaryzuje i upraszcza przesyłanie sygnałów synchronizacji (HS, VS),
+ * wygaszania (HBLANK, VBLANK), liczników pozycji oraz 12-bitowego koloru RGB.
  */
+
 interface vga_if;
 
 logic [10:0] vcount;

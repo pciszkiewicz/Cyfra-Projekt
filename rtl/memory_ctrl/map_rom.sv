@@ -2,12 +2,14 @@
 
 /*
  * MTM UEC2
- * Author: Tomasz Jesionek / Poprawki pod mape 64x64
+ * Author: Tomasz Jesionek
  *
  * Description:
- * ROM memory storing the wall layout for a 64x64 map.
- * Initialized from an external .mem file.
+ * Kontroler pamięci ROM przechowujący topologię ścian areny.
+ * Zaimplementowany jako dwuportowa pamięć BRAM (Block RAM), umożliwiająca jednoczesne
+ * odpytywanie o strukturę kafelków przez renderer VGA oraz system detekcji kolizji.
  */
+
 module map_rom (
     input logic clk,
     input logic rst_n,

@@ -2,9 +2,14 @@
 
 /*
  * MTM UEC2
- * Description: 
- * Modul HUD rysujacy paski zdrowia graczy na wierzchu wygenerowanej ramki VGA.
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Moduł wyświetlacza HUD (Heads-Up Display).
+ * Nakłada na samą górę gotowego obrazu paski życia obu graczy (lokalnego i zdalnego)
+ * umieszczone w estetycznych ramkach w rogach ekranu.
  */
+
 module draw_hud (
     input logic clk,
     input logic rst_n,

@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Uniwersalny detektor zbocza narastającego (Posedge Edge Detector).
+ * Analizuje sygnał wejściowy i generuje dokładnie jeden impuls (szpilkę) zegarową
+ * w momencie wykrycia przejścia ze stanu niskiego w wysoki.
+ */
+
 module edge_detector (
     input logic clk,
     input logic rst_n,

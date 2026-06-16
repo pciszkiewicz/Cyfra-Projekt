@@ -1,14 +1,14 @@
 `timescale 1 ns / 1 ps
 
 /*
- * Copyright (C) 2026 AGH University of Science and Technology
  * MTM UEC2
- * Author: Piotr Ciszkiewicz
+ * Author: Tomasz Jesionek
  *
  * Description:
- * ROM memory storing 256 different crate layouts (32-bit masks).
- * Initialized from an external .mem file.
+ * Pamięć ROM zawierająca prekonfigurowane układy (rozmieszczenie) skrzyń na mapie.
+ * Adresowana za pomocą wartości z generatora LFSR, zapewniając losowość mapy przy każdym starcie.
  */
+
 module crates_rom (
     input logic clk,
     input logic rst_n,

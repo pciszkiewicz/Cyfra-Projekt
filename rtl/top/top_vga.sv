@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Główny moduł strukturalny (Top) logiki systemowej działający w domenie 65MHz.
+ * Łączy komponenty wejścia/wyjścia (PS2, UART), kontrolery wideo VGA, 
+ * pamięci mapy oraz nadrzędny kontroler logiki rozgrywki.
+ */
+
 module top_vga
     import vga_pkg::*;
 (

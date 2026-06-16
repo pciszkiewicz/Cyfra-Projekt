@@ -1,5 +1,16 @@
 `timescale 1 ns / 1 ps
 
+
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Moduł renderujący obiekty interaktywne (skrzynie i przedmioty do zebrania).
+ * Na podstawie masek aktywności pobiera współrzędne z tabeli LUT, adresuje ROMy
+ * i nakłada na potok wideo sprajty skrzyń lub bonusów (leczenie, obrażenia, prędkość).
+ */
+
 module draw_crates (
     input logic clk,
     input logic rst_n,

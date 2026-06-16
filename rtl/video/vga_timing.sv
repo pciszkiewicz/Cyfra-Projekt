@@ -2,11 +2,14 @@
 
 /*
  * MTM UEC2
- * Author: Piotr
+ * Author: Tomasz Jesionek
  *
- * Description: 
- * Vga timing controller.
+ * Description:
+ * Generator timingu VGA dla rozdzielczości 1024x768 @ 60Hz.
+ * Odpowiada za precyzyjne sterowanie licznikami linii i pikseli,
+ * generując sygnały synchronizacji poziomej/pionowej oraz obszaru aktywnego.
  */
+
 module vga_timing
     import vga_pkg::*;
 (

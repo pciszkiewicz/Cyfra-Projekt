@@ -1,11 +1,13 @@
+`timescale 1 ns / 1 ps
+
 /*
  * MTM UEC2
- * Author: Piotr Ciszkiewicz
+ * Author: Tomasz Jesionek
  *
- * Description: 
- * Zbalansowany LUT do mapy "Classic Arena".
- * Map resolution: 64x64 tiles. Each tile = 32px.
- * Bardzo czytelna geometria - koniec z labiryntem!
+ * Description:
+ * Tablica przeglądowa (Look-Up Table) stałych pozycji skrzyń.
+ * Mapuje indeksy skrzyń (0-31) na stałe, zbalansowane współrzędne X/Y na mapie świata,
+ * wykorzystywane przez silnik graficzny i fizyczny.
  */
 
  module crate_lut (

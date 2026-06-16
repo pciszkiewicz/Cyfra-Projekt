@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Dedykowany moduł detekcji kolizji obiektów statycznych (Skrzynie & Łup).
+ * Iteruje maszyną stanów po obiektach na mapie, generując impulsy zniszczenia skrzyń
+ * pociskiem oraz impulsy przyznania bonusów (leczenie, speed, dmg) po wejściu gracza w łup.
+ */
+
 module crates_collision_det (
     input logic clk,
     input logic rst_n,

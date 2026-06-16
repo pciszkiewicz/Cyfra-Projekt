@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz, Tomasz Jesionek
+ *
+ * Description:
+ * Główna maszyna stanów gry (Master Game FSM).
+ * Zarządza globalnymi fazami rozgrywki: ST_INIT (Menu), ST_CHAR_SELECT, 
+ * ST_LOOTING (Zbieranie), ST_COMBAT (Walka) oraz ST_END (Koniec gry i werdykt).
+ */
+
 module game_fsm (
     input logic clk,
     input logic rst_n,

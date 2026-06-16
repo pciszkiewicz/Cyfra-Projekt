@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Moduł renderowania celownika myszy.
+ * Pobiera zsynchronizowane współrzędne X/Y z domeny sprzętowej i rysuje
+ * sprajt celownika (crosshair), centrując teksturę 16x16px idealnie w punkcie kliknięcia.
+ */
+
 module draw_mouse (
     input logic clk,
     input logic rst_n,

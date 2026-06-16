@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Tomasz Jesionek
+ *
+ * Description:
+ * Silnik renderowania mapy świata na podstawie pozycji kamery gracza.
+ * Przelicza pozycje globalne na lokalne współrzędne ekranu, odpytuje pamięć ROM
+ * i nakłada tekstury ścian (wall) oraz podłogi (floor) z mechanizmem przezroczystości.
+ */
+
 module draw_map (
     input logic clk,
     input logic rst_n,

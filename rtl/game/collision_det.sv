@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Moduł detekcji kolizji podstawowych (Fizyka pocisków).
+ * Sprawdza nakładanie się współrzędnych pocisku z hitboxem przeciwnika (hit enemy)
+ * oraz próbkuje siatkę mapy w celu wykrycia zderzenia pocisku ze ścianą (hit wall).
+ */
+
 module collision_det #(
     parameter int PLAYER_SIZE = 32,
     parameter int BULLET_SIZE = 4

@@ -5,8 +5,11 @@
  * Author: Tomasz Jesionek
  *
  * Description:
- * Package with vga related constants.
+ * Pakiet stałych globalnych SystemVerilog dla podsystemu wideo.
+ * Definiuje parametry taktowania sygnału VGA, rozdzielczości ekranu (1024x768),
+ * wymiary obiektów oraz stany maszyn wideo.
  */
+
 package vga_pkg;
 
 localparam HOR_PIXELS = 12'd1024;

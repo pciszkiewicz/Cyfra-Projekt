@@ -2,11 +2,13 @@
 
 /*
  * MTM UEC2
- * Author: Tomasz Jesionek
+ * Author: Piotr Ciszkiewicz
  *
  * Description:
- * Linear-feedback shift register (LFSR) module.
+ * Generator liczb pseudolosowych oparty na rejestrze przesuwnym z liniowym sprzężeniem zwrotnym.
+ * (16-bit LFSR). Wykorzystywany do losowania indeksu konfiguracji skrzyń przy starcie gry.
  */
+
 module lfsr #(
     parameter logic [15:0] SEED = 16'hACE1
 ) (

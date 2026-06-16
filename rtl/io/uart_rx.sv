@@ -1,5 +1,15 @@
 `timescale 1 ns / 1 ps
 
+/*
+ * MTM UEC2
+ * Author: Piotr Ciszkiewicz
+ *
+ * Description:
+ * Uniwersalny odbiornik UART (Receiver) z nadpróbkowaniem sygnału.
+ * Przechwytuje szeregowy strumień danych, wykrywa bit startu w środku czasu trwania,
+ * zatrzaskuje bity i wystawia gotowy bajt danych wraz z flagą rx_ready.
+ */
+
 module uart_rx #(
     parameter int CLK_FREQ = 65_000_000, 
     parameter int BAUD_RATE = 115200
