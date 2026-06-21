@@ -6,8 +6,6 @@
  *
  * Description:
  * Główna maszyna stanów gry (Master Game FSM).
- * Zarządza globalnymi fazami rozgrywki: ST_INIT (Menu), ST_CHAR_SELECT, 
- * ST_LOOTING (Zbieranie), ST_COMBAT (Walka) oraz ST_END (Koniec gry i werdykt).
  */
 
 module game_fsm (
@@ -22,6 +20,7 @@ module game_fsm (
     input logic [31:0] rx_active_loot,
     input logic start_btn,
     input logic char_select_btn,
+    input logic enemy_ready,
     input logic phase_timeout,
     input logic [7:0] lfsr_val,
     input logic [31:0] rom_data,
@@ -58,7 +57,6 @@ always_comb begin
     state_nxt = state_reg;
     active_crates_nxt = active_crates_reg;
     active_loot_nxt = active_loot_reg;
-    
     newly_destroyed_crates = active_crates_reg & crates_hit_mask;
 
     case (state_reg)
@@ -69,9 +67,8 @@ always_comb begin
         end
 
         ST_CHAR_SELECT: begin
-            if (char_select_btn) begin
+            if (char_select_btn && enemy_ready) begin
                 state_nxt = ST_LOOTING;
-                
                 if (is_master) begin
                     active_crates_nxt = rom_data;
                     active_loot_nxt = 32'h0;

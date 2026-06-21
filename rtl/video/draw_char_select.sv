@@ -15,7 +15,9 @@ module draw_char_select (
     input logic rst_n,
     output logic [1:0] class_id,
     output logic char_select_button,
+    output logic my_ready,
     vga_if.out out,
+    input logic enemy_ready,
     input logic [2:0] current_state,
     input logic [11:0] mouse_x,
     input logic [11:0] mouse_y,
@@ -63,6 +65,9 @@ logic [11:0] rgb_d1_reg, rgb_d1_nxt;
 logic [1:0] class_id_reg, class_id_nxt;
 logic char_select_btn_reg, char_select_btn_nxt;
 
+logic my_ready_reg, my_ready_nxt;
+logic [1:0] locked_class_reg, locked_class_nxt;
+
 logic in_panel, in_bar_hp, in_bar_spd, in_bar_dmg;
 logic in_b0, in_b1, in_b2, in_b3;
 logic [11:0] rgb_nxt;
@@ -71,142 +76,91 @@ logic [11:0] rgb_nxt;
 assign click_pulse = mouse_left & (!mouse_left_prev_reg);
 assign class_id = class_id_reg;
 assign char_select_button = char_select_btn_reg;
+assign my_ready = my_ready_reg;
 
 /* Module internal logic */
 always_comb begin
-    hover0 = (mouse_x >= B0_X) && (mouse_x < B0_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
-    hover1 = (mouse_x >= B1_X) && (mouse_x < B1_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
-    hover2 = (mouse_x >= B2_X) && (mouse_x < B2_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
-    hover3 = (mouse_x >= B3_X) && (mouse_x < B3_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
+    my_ready_nxt = my_ready_reg;
+    locked_class_nxt = locked_class_reg;
+    class_id_nxt = class_id_reg;
+    char_select_btn_nxt = 1'b0;
 
-    if (hover1) begin
-        viewed_class = 2'd1;
-    end else if (hover2) begin
-        viewed_class = 2'd2;
-    end else if (hover3) begin
-        viewed_class = 2'd3;
-    end else begin
-        viewed_class = 2'd0;
+    if (current_state != 3'd1) begin
+        my_ready_nxt = 1'b0;
+        locked_class_nxt = 2'd0;
     end
 
-    bar_hp_w = 12'd150;
-    bar_spd_w = 12'd200;
-    bar_dmg_w = 12'd150;
+    hover0 = !my_ready_reg && (mouse_x >= B0_X) && (mouse_x < B0_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
+    hover1 = !my_ready_reg && (mouse_x >= B1_X) && (mouse_x < B1_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
+    hover2 = !my_ready_reg && (mouse_x >= B2_X) && (mouse_x < B2_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
+    hover3 = !my_ready_reg && (mouse_x >= B3_X) && (mouse_x < B3_X + BTN_W) && (mouse_y >= BTN_Y) && (mouse_y < BTN_Y + BTN_H);
+
+    if (my_ready_reg) begin
+        viewed_class = locked_class_reg;
+    end else begin
+        if (hover1)      viewed_class = 2'd1;
+        else if (hover2) viewed_class = 2'd2;
+        else if (hover3) viewed_class = 2'd3;
+        else             viewed_class = 2'd0;
+    end
 
     case (viewed_class)
-        2'd0: begin
-            bar_hp_w = 12'd150;
-            bar_spd_w = 12'd200;
-            bar_dmg_w = 12'd150;
-        end
-        2'd1: begin
-            bar_hp_w = 12'd300;
-            bar_spd_w = 12'd100;
-            bar_dmg_w = 12'd90;
-        end
-        2'd2: begin
-            bar_hp_w = 12'd112;
-            bar_spd_w = 12'd300;
-            bar_dmg_w = 12'd60;
-        end
-        2'd3: begin
-            bar_hp_w = 12'd75;
-            bar_spd_w = 12'd150;
-            bar_dmg_w = 12'd300;
-        end
-        default: begin
-            bar_hp_w = 12'd150;
-            bar_spd_w = 12'd200;
-            bar_dmg_w = 12'd150;
-        end
+        2'd0: begin bar_hp_w = 12'd150; bar_spd_w = 12'd200; bar_dmg_w = 12'd150; end
+        2'd1: begin bar_hp_w = 12'd300; bar_spd_w = 12'd100; bar_dmg_w = 12'd90;  end
+        2'd2: begin bar_hp_w = 12'd112; bar_spd_w = 12'd300; bar_dmg_w = 12'd60;  end
+        2'd3: begin bar_hp_w = 12'd75;  bar_spd_w = 12'd150; bar_dmg_w = 12'd300; end
+        default: begin bar_hp_w = 12'd150; bar_spd_w = 12'd200; bar_dmg_w = 12'd150; end
     endcase
 
-    in_panel = (hcount_d1_reg >= PANEL_X) && (hcount_d1_reg < PANEL_X + PANEL_W) &&
-               (vcount_d1_reg >= PANEL_Y) && (vcount_d1_reg < PANEL_Y + PANEL_H);
-    in_bar_hp = (hcount_d1_reg >= BAR_X) && (hcount_d1_reg < BAR_X + bar_hp_w) &&
-                (vcount_d1_reg >= HP_Y) && (vcount_d1_reg < HP_Y + BAR_H);
-    in_bar_spd = (hcount_d1_reg >= BAR_X) && (hcount_d1_reg < BAR_X + bar_spd_w) &&
-                 (vcount_d1_reg >= SPD_Y) && (vcount_d1_reg < SPD_Y + BAR_H);
-    in_bar_dmg = (hcount_d1_reg >= BAR_X) && (hcount_d1_reg < BAR_X + bar_dmg_w) &&
-                 (vcount_d1_reg >= DMG_Y) && (vcount_d1_reg < DMG_Y + BAR_H);
+    in_panel  = (hcount_d1_reg >= PANEL_X) && (hcount_d1_reg < PANEL_X + PANEL_W) && (vcount_d1_reg >= PANEL_Y) && (vcount_d1_reg < PANEL_Y + PANEL_H);
+    in_bar_hp = (hcount_d1_reg >= BAR_X)   && (hcount_d1_reg < BAR_X + bar_hp_w)  && (vcount_d1_reg >= HP_Y)    && (vcount_d1_reg < HP_Y + BAR_H);
+    in_bar_spd= (hcount_d1_reg >= BAR_X)   && (hcount_d1_reg < BAR_X + bar_spd_w) && (vcount_d1_reg >= SPD_Y)   && (vcount_d1_reg < SPD_Y + BAR_H);
+    in_bar_dmg= (hcount_d1_reg >= BAR_X)   && (hcount_d1_reg < BAR_X + bar_dmg_w) && (vcount_d1_reg >= DMG_Y)   && (vcount_d1_reg < DMG_Y + BAR_H);
     
-    in_b0 = (hcount_d1_reg >= B0_X) && (hcount_d1_reg < B0_X + BTN_W) &&
-            (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
-    in_b1 = (hcount_d1_reg >= B1_X) && (hcount_d1_reg < B1_X + BTN_W) &&
-            (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
-    in_b2 = (hcount_d1_reg >= B2_X) && (hcount_d1_reg < B2_X + BTN_W) &&
-            (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
-    in_b3 = (hcount_d1_reg >= B3_X) && (hcount_d1_reg < B3_X + BTN_W) &&
-            (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
+    in_b0 = (hcount_d1_reg >= B0_X) && (hcount_d1_reg < B0_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
+    in_b1 = (hcount_d1_reg >= B1_X) && (hcount_d1_reg < B1_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
+    in_b2 = (hcount_d1_reg >= B2_X) && (hcount_d1_reg < B2_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
+    in_b3 = (hcount_d1_reg >= B3_X) && (hcount_d1_reg < B3_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
 
     mouse_left_prev_nxt = mouse_left;
     hcount_d1_nxt = in.hcount;
     vcount_d1_nxt = in.vcount;
-    hsync_d1_nxt = in.hsync;
-    vsync_d1_nxt = in.vsync;
-    hblnk_d1_nxt = in.hblnk;
-    vblnk_d1_nxt = in.vblnk;
-    rgb_d1_nxt = in.rgb;
+    hsync_d1_nxt  = in.hsync;
+    vsync_d1_nxt  = in.vsync;
+    hblnk_d1_nxt  = in.hblnk;
+    vblnk_d1_nxt  = in.vblnk;
+    rgb_d1_nxt    = in.rgb;
 
-    class_id_nxt = class_id_reg;
-    char_select_btn_nxt = 1'b0;
-
-    if (current_state == 3'd1 && click_pulse) begin
-        if (hover0) begin
-            class_id_nxt = 2'd0;
-            char_select_btn_nxt = 1'b1;
-        end
-        if (hover1) begin
-            class_id_nxt = 2'd1;
-            char_select_btn_nxt = 1'b1;
-        end
-        if (hover2) begin
-            class_id_nxt = 2'd2;
-            char_select_btn_nxt = 1'b1;
-        end
-        if (hover3) begin
-            class_id_nxt = 2'd3;
-            char_select_btn_nxt = 1'b1;
-        end
+    if (current_state == 3'd1 && click_pulse && !my_ready_reg) begin
+        if (hover0) begin class_id_nxt = 2'd0; locked_class_nxt = 2'd0; my_ready_nxt = 1'b1; char_select_btn_nxt = 1'b1; end
+        if (hover1) begin class_id_nxt = 2'd1; locked_class_nxt = 2'd1; my_ready_nxt = 1'b1; char_select_btn_nxt = 1'b1; end
+        if (hover2) begin class_id_nxt = 2'd2; locked_class_nxt = 2'd2; my_ready_nxt = 1'b1; char_select_btn_nxt = 1'b1; end
+        if (hover3) begin class_id_nxt = 2'd3; locked_class_nxt = 2'd3; my_ready_nxt = 1'b1; char_select_btn_nxt = 1'b1; end
     end
 
     rgb_nxt = rgb_d1_reg;
-
     if (current_state == 3'd1 && (!vblnk_d1_reg) && (!hblnk_d1_reg)) begin
         rgb_nxt = 12'h222; 
-
-        if (in_bar_hp) begin
-            rgb_nxt = 12'h2D2;
-        end else if (in_bar_spd) begin
-            rgb_nxt = 12'h2AF;
-        end else if (in_bar_dmg) begin
-            rgb_nxt = 12'hF22;
-        end else if (in_panel) begin
-            rgb_nxt = 12'h444;
-        end else if (in_b0) begin
-            if (hover0) begin
-                rgb_nxt = 12'hF55;
-            end else begin
-                rgb_nxt = 12'hA00;
-            end
-        end else if (in_b1) begin
-            if (hover1) begin
-                rgb_nxt = 12'h5F5;
-            end else begin
-                rgb_nxt = 12'h0A0;
-            end
-        end else if (in_b2) begin
-            if (hover2) begin
-                rgb_nxt = 12'h55F;
-            end else begin
-                rgb_nxt = 12'h00A;
-            end
-        end else if (in_b3) begin
-            if (hover3) begin
-                rgb_nxt = 12'hFF5;
-            end else begin
-                rgb_nxt = 12'hAA0;
-            end
+        
+        if (in_bar_hp)       rgb_nxt = 12'h2D2;
+        else if (in_bar_spd) rgb_nxt = 12'h2AF;
+        else if (in_bar_dmg) rgb_nxt = 12'hF22;
+        else if (in_panel)   rgb_nxt = 12'h444;
+        else if (in_b0) begin
+            if (my_ready_reg) rgb_nxt = (locked_class_reg == 2'd0) ? ((!enemy_ready) ? 12'hFFF : 12'h0F0) : 12'h111;
+            else rgb_nxt = hover0 ? 12'hF55 : 12'hA00;
+        end 
+        else if (in_b1) begin
+            if (my_ready_reg) rgb_nxt = (locked_class_reg == 2'd1) ? ((!enemy_ready) ? 12'hFFF : 12'h0F0) : 12'h111;
+            else rgb_nxt = hover1 ? 12'h5F5 : 12'h0A0;
+        end 
+        else if (in_b2) begin
+            if (my_ready_reg) rgb_nxt = (locked_class_reg == 2'd2) ? ((!enemy_ready) ? 12'hFFF : 12'h0F0) : 12'h111;
+            else rgb_nxt = hover2 ? 12'h55F : 12'h00A;
+        end 
+        else if (in_b3) begin
+            if (my_ready_reg) rgb_nxt = (locked_class_reg == 2'd3) ? ((!enemy_ready) ? 12'hFFF : 12'h0F0) : 12'h111;
+            else rgb_nxt = hover3 ? 12'hFF5 : 12'hAA0;
         end
     end
 end
@@ -225,6 +179,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 
         class_id_reg <= 2'd0;
         char_select_btn_reg <= 1'b0;
+        
+        my_ready_reg <= 1'b0;
+        locked_class_reg <= 2'd0;
         
         out.vcount <= 11'h0;
         out.hcount <= 11'h0;
@@ -246,6 +203,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 
         class_id_reg <= class_id_nxt;
         char_select_btn_reg <= char_select_btn_nxt;
+
+        my_ready_reg <= my_ready_nxt;
+        locked_class_reg <= locked_class_nxt;
 
         out.vcount <= vcount_d1_reg;
         out.hcount <= hcount_d1_reg;

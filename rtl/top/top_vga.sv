@@ -45,14 +45,12 @@ logic logic_tick_60hz;
 
 logic [11:0] mouse_x_raw, mouse_y_raw;
 logic mouse_right_raw, mouse_left_raw, mouse_new_event;
-
 logic mouse_toggle_100_reg, mouse_toggle_100_nxt;
 
 (* ASYNC_REG = "TRUE" *) logic mouse_toggle_sync1_reg, mouse_toggle_sync2_reg, mouse_toggle_sync3_reg;
 logic mouse_toggle_sync1_nxt, mouse_toggle_sync2_nxt, mouse_toggle_sync3_nxt;
 
 logic mouse_event_65MHz;
-
 (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_x_sync1_reg;
 (* ASYNC_REG = "TRUE" *) logic [11:0] mouse_y_sync1_reg;
 (* ASYNC_REG = "TRUE" *) logic mouse_left_sync1_reg;
@@ -71,7 +69,7 @@ logic [2:0] current_state;
 logic [31:0] active_crates, active_loot, rx_active_crates, rx_active_loot, crates_hit_mask, loot_collected_mask;
 logic [15:0] my_world_x, my_world_y, enemy_world_x, enemy_world_y, my_bullet_x, my_bullet_y, enemy_bullet_x, enemy_bullet_y, player_next_x, player_next_y;
 logic [7:0] my_hp, my_dmg, enemy_hp, my_bullet_dmg, rx_take_dmg_val;
-logic my_dead, char_select_btn, my_bullet_active, enemy_bullet_active, rx_take_dmg_en, hit_enemy, hit_wall;
+logic my_dead, char_select_btn, my_ready_lock, my_bullet_active, enemy_bullet_active, rx_take_dmg_en, hit_enemy, hit_wall;
 logic [1:0] class_id;
 logic apply_heal, apply_dmg_boost, apply_speed_boost;
 
@@ -82,8 +80,10 @@ logic mouse_lmb_pulse, mouse_rmb_pulse, rx_take_dmg_pulse;
 logic tx_start, tx_busy, rx_ready;
 logic [7:0] tx_data, rx_data;
 
-logic [9:0] timeout_counter_reg, timeout_counter_nxt;
+logic [10:0] timeout_counter_reg, timeout_counter_nxt;
 logic phase_timeout_pulse_reg, phase_timeout_pulse_nxt;
+
+logic [15:0] center_x, center_y;
 
 /* Signals assignments */
 assign vs = mouse_to_out.vsync;
@@ -92,7 +92,10 @@ assign {r, g, b} = mouse_to_out.rgb;
 
 assign logic_tick_60hz = timing_to_map.vsync & (~vsync_reg);
 assign mouse_event_65MHz = mouse_toggle_sync2_reg ^ mouse_toggle_sync3_reg;
-assign map_addr_player = {player_next_y[10:5], player_next_x[10:5]};
+
+assign center_x = player_next_x + 16'd16;
+assign center_y = player_next_y + 16'd16;
+assign map_addr_player = {center_y[10:5], center_x[10:5]};
 
 /* Module internal logic */
 always_comb begin
@@ -101,7 +104,6 @@ end
 
 always_comb begin
     mouse_toggle_100_nxt = mouse_toggle_100_reg;
-    
     if (mouse_new_event) begin
         mouse_toggle_100_nxt = ~mouse_toggle_100_reg;
     end
@@ -118,7 +120,6 @@ always_comb begin
     mouse_y_sync1_nxt = mouse_y_sync1_reg;
     mouse_left_sync1_nxt = mouse_left_sync1_reg;
     mouse_right_sync1_nxt = mouse_right_sync1_reg;
-
     if (mouse_event_65MHz) begin
         mouse_x_sync1_nxt = mouse_x_raw;
         mouse_y_sync1_nxt = mouse_y_raw;
@@ -135,15 +136,14 @@ end
 always_comb begin
     timeout_counter_nxt = timeout_counter_reg;
     phase_timeout_pulse_nxt = 1'b0;
-
     if ((current_state == 3'd2) && logic_tick_60hz) begin
-        if (timeout_counter_reg == 10'd600) begin 
+        if (timeout_counter_reg == 11'd1800) begin 
             phase_timeout_pulse_nxt = 1'b1;
         end else begin
-            timeout_counter_nxt = timeout_counter_reg + 10'd1;
+            timeout_counter_nxt = timeout_counter_reg + 11'd1;
         end
     end else if (current_state != 3'd2) begin
-        timeout_counter_nxt = 10'd0;
+        timeout_counter_nxt = 11'd0;
     end
 end
 
@@ -169,7 +169,7 @@ always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
         mouse_y_sync2_reg <= 12'h0;
         mouse_left_sync2_reg <= 1'b0;
         mouse_right_sync2_reg <= 1'b0;
-        timeout_counter_reg <= 10'd0;
+        timeout_counter_reg <= 11'd0;
         phase_timeout_pulse_reg <= 1'b0;
     end else begin
         vsync_reg <= vsync_nxt;
@@ -240,7 +240,8 @@ game_logic_top u_game_logic (
     .rx_active_crates    (rx_active_crates),
     .rx_active_loot      (rx_active_loot),
     .start_btn           (mouse_lmb_pulse && ((current_state == 3'd0) || (current_state == 3'd4))),
-    .char_select_btn     (char_select_btn),
+    .char_select_btn     (my_ready_lock),
+    .enemy_ready         (enemy_hp > 8'd0),
     .phase_timeout       (phase_timeout_pulse_reg),
     .crates_hit_mask     (crates_hit_mask),
     .loot_collected_mask (loot_collected_mask),
@@ -295,7 +296,7 @@ bullet_ctl #(
     .player_dmg       (my_dmg),
     .hit_wall         (hit_wall),
     .hit_enemy        (hit_enemy),
-    .phase_combat     (current_state == 3'd2)
+    .phase_combat     (current_state == 3'd3)
 );
 
 collision_det u_collision_det (
@@ -472,6 +473,8 @@ draw_char_select u_char_select (
     .rst_n               (rst_sys_n),
     .class_id            (class_id),
     .char_select_button  (char_select_btn),
+    .my_ready            (my_ready_lock),
+    .enemy_ready         (enemy_hp > 8'd0),
     .out                 (char_to_mouse.out),
     .current_state       (current_state),
     .mouse_x             (mouse_x_sync2_reg),
