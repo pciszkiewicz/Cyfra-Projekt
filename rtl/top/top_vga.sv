@@ -36,7 +36,8 @@ vga_if crates_to_entities();
 vga_if entities_to_hud();
 vga_if hud_to_start();
 vga_if start_to_char();
-vga_if char_to_mouse();
+vga_if char_to_game_over();
+vga_if game_over_to_mouse();
 vga_if mouse_to_out();
 
 /* Local variables and signals */
@@ -72,6 +73,7 @@ logic [7:0] my_hp, my_dmg, enemy_hp, my_bullet_dmg, rx_take_dmg_val;
 logic my_dead, char_select_btn, my_ready_lock, my_bullet_active, enemy_bullet_active, rx_take_dmg_en, hit_enemy, hit_wall;
 logic [1:0] class_id;
 logic apply_heal, apply_dmg_boost, apply_speed_boost;
+logic [1:0] winner_id;
 
 logic [11:0] map_addr_vga, map_addr_collision, map_addr_player;
 logic is_wall_vga, is_wall_collision, is_wall_player;
@@ -236,6 +238,7 @@ game_logic_top u_game_logic (
     .active_crates       (active_crates),
     .active_loot         (active_loot),
     .current_state       (current_state),
+    .winner_id           (winner_id),
     .is_master           (is_master),
     .rx_active_crates    (rx_active_crates),
     .rx_active_loot      (rx_active_loot),
@@ -477,7 +480,7 @@ draw_char_select u_char_select (
     .char_select_button  (char_select_btn),
     .my_ready            (my_ready_lock),
     .enemy_ready         (enemy_hp > 8'd0),
-    .out                 (char_to_mouse.out),
+    .out                 (char_to_game_over.out),
     .current_state       (current_state),
     .mouse_x             (mouse_x_sync2_reg),
     .mouse_y             (mouse_y_sync2_reg),
@@ -485,11 +488,20 @@ draw_char_select u_char_select (
     .in                  (start_to_char.in)
 );
 
+draw_game_over u_draw_game_over (
+    .clk            (clk_65MHz),
+    .rst_n          (rst_sys_n),
+    .current_state  (current_state),
+    .winner_id      (winner_id),
+    .in             (char_to_game_over.in),
+    .out            (game_over_to_mouse.out)
+);
+
 draw_mouse u_draw_mouse (
     .clk    (clk_65MHz),
     .rst_n  (rst_sys_n),
     .out    (mouse_to_out.out),
-    .in     (char_to_mouse.in),
+    .in     (game_over_to_mouse.in),
     .xpos   (mouse_x_sync2_reg),
     .ypos   (mouse_y_sync2_reg)
 );

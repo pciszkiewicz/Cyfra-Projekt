@@ -27,6 +27,7 @@ sv work ../../rtl/video/draw_hud.sv
 sv work ../../rtl/video/draw_start_screen.sv
 sv work ../../rtl/video/draw_char_select.sv
 sv work ../../rtl/video/draw_mouse.sv
+sv work ../../rtl/video/draw_game_over.sv
 
 # Logika Ruchu, Postaci i Walki
 

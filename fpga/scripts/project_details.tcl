@@ -56,6 +56,7 @@ set sv_files {
     ../rtl/video/draw_entities.sv
     ../rtl/video/draw_hud.sv
     ../rtl/video/draw_mouse.sv
+    ../rtl/video/draw_game_over.sv
     ../rtl/game/player_ctl.sv
     ../rtl/game/game_fsm.sv
     ../rtl/game/game_logic_top.sv
