@@ -111,18 +111,18 @@ always_comb begin
             end 
             2'b01: begin
                 hp_nxt = 8'd200;
-                speed_nxt = 4'd2;
+                speed_nxt = 4'd3;
                 dmg_nxt = 8'd15;
             end 
             2'b10: begin
                 hp_nxt = 8'd75;
-                speed_nxt = 4'd6;
+                speed_nxt = 4'd5;
                 dmg_nxt = 8'd10;
             end 
             2'b11: begin
                 hp_nxt = 8'd50;
                 speed_nxt = 4'd3;
-                dmg_nxt = 8'd50;
+                dmg_nxt = 8'd40;
             end
             default: begin
                 hp_nxt = 8'd100;
