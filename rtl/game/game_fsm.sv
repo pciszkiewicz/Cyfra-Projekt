@@ -15,6 +15,7 @@ module game_fsm (
     output logic [31:0] active_crates,
     output logic [31:0] active_loot,
     output logic [2:0] current_state,
+    output logic [1:0] winner_id,
     input logic is_master,
     input logic [31:0] rx_active_crates,
     input logic [31:0] rx_active_loot,
@@ -46,12 +47,14 @@ state_t state_reg, state_nxt;
 logic [31:0] active_crates_reg, active_crates_nxt;
 logic [31:0] active_loot_reg, active_loot_nxt;
 logic [31:0] newly_destroyed_crates;
+logic [1:0] winner_id_reg, winner_id_nxt;
 
 /* Signals assignments */
 assign current_state = state_reg;
 assign active_crates = active_crates_reg;
 assign active_loot = active_loot_reg;
 assign rom_addr = lfsr_val;
+assign winner_id = winner_id_reg;
 
 /* Module internal logic */
 always_comb begin
@@ -59,6 +62,7 @@ always_comb begin
     active_crates_nxt = active_crates_reg;
     active_loot_nxt = active_loot_reg;
     newly_destroyed_crates = active_crates_reg & crates_hit_mask;
+    winner_id_nxt = winner_id_reg;
 
     case (state_reg)
         ST_INIT: begin
@@ -91,7 +95,6 @@ always_comb begin
             end
         end
         
-
         ST_LOOTING: begin
             if (is_master) begin
                 active_crates_nxt = active_crates_reg & (~crates_hit_mask);
@@ -111,12 +114,20 @@ always_comb begin
         ST_COMBAT: begin
             if (p1_dead || p2_dead) begin
                 state_nxt = ST_END;
+                if (p2_dead) begin
+                    winner_id_nxt = is_master ? 2'd1 : 2'd2;
+                end else if (p1_dead) begin
+                    winner_id_nxt = is_master ? 2'd2 : 2'd1;
+                end
             end
         end
         
         ST_END: begin
             if (start_btn) begin
                 state_nxt = ST_INIT;
+                winner_id_nxt = 2'd0;
+            end else begin 
+                
             end
         end
         
@@ -131,10 +142,12 @@ always_ff @(posedge clk or negedge rst_n) begin
         state_reg <= ST_INIT;
         active_crates_reg <= 32'h0;
         active_loot_reg <= 32'h0;
+        winner_id_reg <= 2'd0;
     end else begin
         state_reg <= state_nxt;
         active_crates_reg <= active_crates_nxt;
         active_loot_reg <= active_loot_nxt;
+        winner_id_reg <= winner_id_nxt;
     end
 end
 
