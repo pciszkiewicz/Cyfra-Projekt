@@ -83,6 +83,11 @@ logic [7:0] tx_data, rx_data;
 logic [10:0] timeout_counter_reg, timeout_counter_nxt;
 logic phase_timeout_pulse_reg, phase_timeout_pulse_nxt;
 
+logic mouse_over_start_btn;
+logic start_clicked_reg, start_clicked_nxt;
+logic [5:0] start_timer_reg, start_timer_nxt;
+logic delayed_start_pulse;
+
 logic [15:0] center_x, center_y;
 
 /* Signals assignments */
@@ -147,6 +152,31 @@ always_comb begin
     end
 end
 
+always_comb begin
+    start_clicked_nxt = start_clicked_reg;
+    start_timer_nxt = start_timer_reg;
+    delayed_start_pulse = 1'b0;
+
+    // Kliknięcie działa tylko w obszarze przycisku dla ST_INIT (3'd0)
+    if (mouse_lmb_pulse && ((current_state == 3'd0 && mouse_over_start_btn) || (current_state == 3'd5))) begin
+        start_clicked_nxt = 1'b1;
+        start_timer_nxt = 6'd0;
+    end
+
+    // Odliczanie opóźnienia - 15 klatek zegara 60Hz to dokładnie 0.25 sekundy
+    if (start_clicked_reg) begin
+        if (logic_tick_60hz) begin
+            if (start_timer_reg == 6'd15) begin
+                delayed_start_pulse = 1'b1;
+                start_clicked_nxt = 1'b0;
+                start_timer_nxt = 6'd0;
+            end else begin
+                start_timer_nxt = start_timer_reg + 6'd1;
+            end
+        end
+    end
+end
+
 always_ff @(posedge clk_100MHz or negedge rst_100m_n) begin
     if (!rst_100m_n) begin
         mouse_toggle_100_reg <= 1'b0;
@@ -171,6 +201,8 @@ always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
         mouse_right_sync2_reg <= 1'b0;
         timeout_counter_reg <= 11'd0;
         phase_timeout_pulse_reg <= 1'b0;
+        start_clicked_reg <= 1'b0;
+        start_timer_reg <= 6'd0;
     end else begin
         vsync_reg <= vsync_nxt;
         mouse_toggle_sync1_reg <= mouse_toggle_sync1_nxt;
@@ -186,6 +218,8 @@ always_ff @(posedge clk_65MHz or negedge rst_sys_n) begin
         mouse_right_sync2_reg <= mouse_right_sync2_nxt;
         timeout_counter_reg <= timeout_counter_nxt;
         phase_timeout_pulse_reg <= phase_timeout_pulse_nxt;
+        start_clicked_reg <= start_clicked_nxt;
+        start_timer_reg <= start_timer_nxt;
     end
 end
 
@@ -239,7 +273,7 @@ game_logic_top u_game_logic (
     .is_master           (is_master),
     .rx_active_crates    (rx_active_crates),
     .rx_active_loot      (rx_active_loot),
-    .start_btn           (mouse_lmb_pulse && ((current_state == 3'd0) || (current_state == 3'd5))),
+    .start_btn           (delayed_start_pulse), 
     .char_select_btn     (my_ready_lock),
     .enemy_ready         (enemy_hp > 8'd0),
     .phase_timeout       (phase_timeout_pulse_reg),
@@ -459,15 +493,17 @@ draw_hud u_draw_hud (
 );
 
 draw_start_screen u_draw_start_screen (
-    .clk            (clk_65MHz),
-    .rst_n          (rst_sys_n),
-    .is_master      (is_master),
-    .out            (start_to_char.out),
-    .current_state  (current_state),
-    .mouse_x        (mouse_x_sync2_reg),
-    .mouse_y        (mouse_y_sync2_reg),
-    .mouse_left     (mouse_left_sync2_reg),
-    .in             (hud_to_start.in)
+    .clk                (clk_65MHz),
+    .rst_n              (rst_sys_n),
+    .is_master          (is_master),
+    .out                (start_to_char.out),
+    .current_state      (current_state),
+    .mouse_x            (mouse_x_sync2_reg),
+    .mouse_y            (mouse_y_sync2_reg),
+    .mouse_left         (mouse_left_sync2_reg),
+    .start_clicked      (start_clicked_reg),
+    .mouse_over_button  (mouse_over_start_btn),
+    .in                 (hud_to_start.in)
 );
 
 draw_char_select u_char_select (
