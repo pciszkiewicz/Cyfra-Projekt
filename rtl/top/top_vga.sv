@@ -136,13 +136,13 @@ end
 always_comb begin
     timeout_counter_nxt = timeout_counter_reg;
     phase_timeout_pulse_nxt = 1'b0;
-    if ((current_state == 3'd2) && logic_tick_60hz) begin
+    if ((current_state == 3'd3) && logic_tick_60hz) begin
         if (timeout_counter_reg == 11'd1800) begin 
             phase_timeout_pulse_nxt = 1'b1;
         end else begin
             timeout_counter_nxt = timeout_counter_reg + 11'd1;
         end
-    end else if (current_state != 3'd2) begin
+    end else if (current_state != 3'd3) begin
         timeout_counter_nxt = 11'd0;
     end
 end
@@ -239,7 +239,7 @@ game_logic_top u_game_logic (
     .is_master           (is_master),
     .rx_active_crates    (rx_active_crates),
     .rx_active_loot      (rx_active_loot),
-    .start_btn           (mouse_lmb_pulse && ((current_state == 3'd0) || (current_state == 3'd4))),
+    .start_btn           (mouse_lmb_pulse && ((current_state == 3'd0) || (current_state == 3'd5))),
     .char_select_btn     (my_ready_lock),
     .enemy_ready         (enemy_hp > 8'd0),
     .phase_timeout       (phase_timeout_pulse_reg),
@@ -351,7 +351,7 @@ uart_packet_ctl u_packet_ctl (
     .tx_start            (tx_start),
     .tx_data             (tx_data),
     .send_tick           (logic_tick_60hz),
-    .hit_enemy           (hit_enemy && (current_state == 3'd3)),
+    .hit_enemy           (hit_enemy && (current_state == 3'd4)),
     .enemy_x             (enemy_world_x),
     .enemy_y             (enemy_world_y),
     .enemy_hp            (enemy_hp),
