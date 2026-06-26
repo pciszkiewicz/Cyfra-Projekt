@@ -296,7 +296,7 @@ bullet_ctl #(
     .player_dmg       (my_dmg),
     .hit_wall         (hit_wall),
     .hit_enemy        (hit_enemy),
-    .phase_combat     ((current_state == 3'd2) || (current_state == 3'd3))
+    .phase_combat     ((current_state == 3'd3) || (current_state == 3'd4))
 );
 
 collision_det u_collision_det (
