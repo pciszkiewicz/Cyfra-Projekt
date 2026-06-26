@@ -52,7 +52,6 @@ sv work ../../rtl/game/game_logic_top.sv
 
 sv work ../../rtl/top/top_vga.sv
 sv work ../common/tiff_writer.sv
-verilog work ../common/glbl.v
 sv work ../../fpga/rtl/top_vga_basys3.sv
 verilog work ../../fpga/rtl/clk_wiz_0.v
 verilog work ../../fpga/rtl/clk_wiz_0_clk_wiz.v
