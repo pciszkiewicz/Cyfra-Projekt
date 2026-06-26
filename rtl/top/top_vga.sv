@@ -296,7 +296,7 @@ bullet_ctl #(
     .player_dmg       (my_dmg),
     .hit_wall         (hit_wall),
     .hit_enemy        (hit_enemy),
-    .phase_combat     (current_state == 3'd3)
+    .phase_combat     ((current_state == 3'd2) || (current_state == 3'd3))
 );
 
 collision_det u_collision_det (
@@ -351,7 +351,7 @@ uart_packet_ctl u_packet_ctl (
     .tx_start            (tx_start),
     .tx_data             (tx_data),
     .send_tick           (logic_tick_60hz),
-    .hit_enemy           (hit_enemy),
+    .hit_enemy           (hit_enemy && (current_state == 3'd3)),
     .enemy_x             (enemy_world_x),
     .enemy_y             (enemy_world_y),
     .enemy_hp            (enemy_hp),
