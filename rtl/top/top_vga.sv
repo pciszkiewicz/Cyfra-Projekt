@@ -75,8 +75,10 @@ logic [1:0] class_id;
 logic apply_heal, apply_dmg_boost, apply_speed_boost;
 logic [1:0] winner_id;
 
-logic [11:0] map_addr_vga, map_addr_collision, map_addr_player;
-logic is_wall_vga, is_wall_collision, is_wall_player;
+logic is_wall_x, is_wall_y;
+logic [11:0] map_addr_x, map_addr_y;
+logic [15:0] check_x, check_y;
+logic [15:0] current_center_x, current_center_y;
 
 logic mouse_lmb_pulse, mouse_rmb_pulse, rx_take_dmg_pulse;
 logic tx_start, tx_busy, rx_ready;
@@ -90,6 +92,9 @@ logic start_clicked_reg, start_clicked_nxt;
 logic [5:0] start_timer_reg, start_timer_nxt;
 logic delayed_start_pulse;
 
+logic [11:0] map_addr_vga, map_addr_collision;
+logic is_wall_vga, is_wall_collision;
+
 logic [15:0] center_x, center_y;
 
 /* Signals assignments */
@@ -100,9 +105,25 @@ assign {r, g, b} = mouse_to_out.rgb;
 assign logic_tick_60hz = timing_to_map.vsync & (~vsync_reg);
 assign mouse_event_65MHz = mouse_toggle_sync2_reg ^ mouse_toggle_sync3_reg;
 
-assign center_x = player_next_x + 16'd16;
-assign center_y = player_next_y + 16'd16;
-assign map_addr_player = {center_y[10:5], center_x[10:5]};
+assign current_center_x = my_world_x + 16'd16;
+assign current_center_y = my_world_y + 16'd16;
+
+always_comb begin
+    // Weryfikacja osi X
+    check_x = current_center_x;
+    if (player_next_x > my_world_x) check_x = current_center_x + 16'd14;
+    else if (player_next_x < my_world_x) check_x = current_center_x - 16'd14;
+
+    // Weryfikacja osi Y
+    check_y = current_center_y;
+    if (player_next_y > my_world_y) check_y = current_center_y + 16'd14;
+    else if (player_next_y < my_world_y) check_y = current_center_y - 16'd14;
+end
+
+// Port A: sprawdzamy nową pozycję X, ale wciąż STARĄ pozycję Y
+assign map_addr_x = {current_center_y[10:5], check_x[10:5]};
+// Port B: sprawdzamy STARĄ pozycję X, ale za to nową pozycję Y
+assign map_addr_y = {check_y[10:5], current_center_x[10:5]};
 
 /* Module internal logic */
 always_comb begin
@@ -312,7 +333,8 @@ player_ctl #(
     .apply_dmg_boost   (apply_dmg_boost),
     .apply_speed_boost (apply_speed_boost),
     .movement_en       ((current_state == 3'd3) || (current_state == 3'd4)),
-    .is_wall_ahead     (is_wall_player)
+    .is_wall_x         (is_wall_x),
+    .is_wall_y         (is_wall_y)
 );
 
 bullet_ctl #(
@@ -422,22 +444,22 @@ uart_rx u_uart_rx (
     .rx_ready (rx_ready)
 );
 
-map_rom u_map_rom (
-    .clk       (clk_65MHz),
-    .rst_n     (rst_sys_n),
-    .is_wall_a (is_wall_vga),
-    .is_wall_b (is_wall_collision),
-    .addr_a    (map_addr_vga),
-    .addr_b    (map_addr_collision)
-);
-
 map_rom u_map_rom_player (
     .clk       (clk_65MHz),
     .rst_n     (rst_sys_n),
-    .is_wall_a (is_wall_player),
-    .is_wall_b (),
-    .addr_a    (map_addr_player),
-    .addr_b    (12'h0)
+    .is_wall_a (is_wall_x),
+    .is_wall_b (is_wall_y),
+    .addr_a    (map_addr_x),
+    .addr_b    (map_addr_y)
+);
+
+map_rom u_map_rom_vga (
+    .clk       (clk_65MHz),
+    .rst_n     (rst_sys_n),
+    .is_wall_a (is_wall_vga),
+    .is_wall_b (is_wall_collision), 
+    .addr_a    (map_addr_vga),
+    .addr_b    (map_addr_collision)
 );
 
 vga_timing u_vga_timing (

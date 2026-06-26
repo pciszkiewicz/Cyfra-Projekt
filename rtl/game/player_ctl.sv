@@ -39,7 +39,8 @@ module player_ctl #(
     input logic apply_dmg_boost,
     input logic apply_speed_boost,
     input logic movement_en,
-    input logic is_wall_ahead
+    input logic is_wall_x,
+    input logic is_wall_y
 );
 
 /* Local parameters */
@@ -177,10 +178,8 @@ always_comb begin
         move_pending_nxt[2] = move_pending_reg[1];
         
         if (move_pending_reg[2]) begin
-            if (!is_wall_ahead) begin 
-                world_x_nxt = req_x_reg;
-                world_y_nxt = req_y_reg;
-            end
+            if (!is_wall_x) world_x_nxt = req_x_reg;
+            if (!is_wall_y) world_y_nxt = req_y_reg;
         end
     end
 end

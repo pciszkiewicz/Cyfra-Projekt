@@ -70,7 +70,7 @@ always_comb begin
 
     is_gracz_text = is_txt_g | is_txt_r | is_txt_a | is_txt_c | is_txt_z;
 
-    // --- 3. SŁOWO "WYGRYWA" (Wyśrodkowane X: ~410, Y: 390) ---
+    // --- 3. SŁOWO "WYGRYWA" ---
     is_txt_w = (in.hcount >= 11'd410 && in.hcount < 11'd415 && in.vcount >= 11'd390 && in.vcount < 11'd415) ||
                (in.hcount >= 11'd420 && in.hcount < 11'd425 && in.vcount >= 11'd390 && in.vcount < 11'd415) ||
                (in.hcount >= 11'd430 && in.hcount < 11'd435 && in.vcount >= 11'd390 && in.vcount < 11'd415) ||
