@@ -461,6 +461,7 @@ draw_hud u_draw_hud (
 draw_start_screen u_draw_start_screen (
     .clk            (clk_65MHz),
     .rst_n          (rst_sys_n),
+    .is_master      (is_master),
     .out            (start_to_char.out),
     .current_state  (current_state),
     .mouse_x        (mouse_x_sync2_reg),
