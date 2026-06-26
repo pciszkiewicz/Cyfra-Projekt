@@ -34,9 +34,10 @@ module game_fsm (
 typedef enum logic [2:0] {
     ST_INIT        = 3'd0,
     ST_CHAR_SELECT = 3'd1,
-    ST_LOOTING     = 3'd2,
-    ST_COMBAT      = 3'd3,
-    ST_END         = 3'd4
+    ST_WAIT        = 3'd2,
+    ST_LOOTING     = 3'd3,
+    ST_COMBAT      = 3'd4,
+    ST_END         = 3'd5
 } state_t;
 
 /* Local variables and signals */
@@ -67,15 +68,30 @@ always_comb begin
         end
 
         ST_CHAR_SELECT: begin
-            if (char_select_btn && enemy_ready) begin
+            if (char_select_btn) begin
+                if(enemy_ready) begin 
+                    state_nxt = ST_LOOTING;
+                    if (is_master) begin
+                        active_crates_nxt = rom_data;
+                        active_loot_nxt = 32'h0;
+                    end
+                end else begin
+                    state_nxt = ST_WAIT;
+                end
+            end
+        end
+        
+        ST_WAIT: begin
+            if(enemy_ready) begin
                 state_nxt = ST_LOOTING;
-                if (is_master) begin
+                if(is_master) begin
                     active_crates_nxt = rom_data;
                     active_loot_nxt = 32'h0;
                 end
             end
         end
         
+
         ST_LOOTING: begin
             if (is_master) begin
                 active_crates_nxt = active_crates_reg & (~crates_hit_mask);
