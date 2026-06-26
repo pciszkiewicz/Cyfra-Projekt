@@ -46,6 +46,9 @@ localparam logic [11:0] HP_Y = 12'd200;
 localparam logic [11:0] SPD_Y = 12'd260;
 localparam logic [11:0] DMG_Y = 12'd320;
 
+localparam logic [11:0] ICON_X = 12'd360;
+localparam logic [11:0] ICON_SIZE = 12'd32;
+
 /* Local variables and signals */
 logic mouse_left_prev_reg, mouse_left_prev_nxt;
 logic click_pulse;
@@ -71,6 +74,23 @@ logic [1:0] locked_class_reg, locked_class_nxt;
 logic in_panel, in_bar_hp, in_bar_spd, in_bar_dmg;
 logic in_b0, in_b1, in_b2, in_b3;
 logic [11:0] rgb_nxt;
+
+(* rom_style = "block" *) logic [11:0] rom_heal [1024];
+(* rom_style = "block" *) logic [11:0] rom_spd [1024];
+(* rom_style = "block" *) logic [11:0] rom_dmg [1024];
+
+logic [11:0] pix_hp_reg, pix_hp_nxt;
+logic [11:0] pix_spd_reg, pix_spd_nxt;
+logic [11:0] pix_dmg_reg, pix_dmg_nxt;
+
+logic [9:0] icon_addr_hp, icon_addr_spd, icon_addr_dmg;
+logic in_icon_hp, in_icon_spd, in_icon_dmg;
+
+initial begin
+    $readmemh("../../rtl/memory/loot_heal.mem", rom_heal);
+    $readmemh("../../rtl/memory/loot_speed.mem", rom_spd);
+    $readmemh("../../rtl/memory/loot_dmg.mem", rom_dmg);
+end
 
 /* Signals assignments */
 assign click_pulse = mouse_left & (!mouse_left_prev_reg);
@@ -122,6 +142,18 @@ always_comb begin
     in_b2 = (hcount_d1_reg >= B2_X) && (hcount_d1_reg < B2_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
     in_b3 = (hcount_d1_reg >= B3_X) && (hcount_d1_reg < B3_X + BTN_W) && (vcount_d1_reg >= BTN_Y) && (vcount_d1_reg < BTN_Y + BTN_H);
 
+    in_icon_hp  = (hcount_d1_reg >= ICON_X) && (hcount_d1_reg < ICON_X + ICON_SIZE) && (vcount_d1_reg >= HP_Y - 4)  && (vcount_d1_reg < HP_Y - 4 + ICON_SIZE);
+    in_icon_spd = (hcount_d1_reg >= ICON_X) && (hcount_d1_reg < ICON_X + ICON_SIZE) && (vcount_d1_reg >= SPD_Y - 4) && (vcount_d1_reg < SPD_Y - 4 + ICON_SIZE);
+    in_icon_dmg = (hcount_d1_reg >= ICON_X) && (hcount_d1_reg < ICON_X + ICON_SIZE) && (vcount_d1_reg >= DMG_Y - 4) && (vcount_d1_reg < DMG_Y - 4 + ICON_SIZE);
+
+    icon_addr_hp  = {5'(in.vcount - (HP_Y - 4)), 5'(in.hcount - ICON_X)};
+    icon_addr_spd = {5'(in.vcount - (SPD_Y - 4)), 5'(in.hcount - ICON_X)};
+    icon_addr_dmg = {5'(in.vcount - (DMG_Y - 4)), 5'(in.hcount - ICON_X)};
+
+    pix_hp_nxt  = rom_heal[icon_addr_hp];
+    pix_spd_nxt = rom_spd[icon_addr_spd];
+    pix_dmg_nxt = rom_dmg[icon_addr_dmg];
+
     mouse_left_prev_nxt = mouse_left;
     hcount_d1_nxt = in.hcount;
     vcount_d1_nxt = in.vcount;
@@ -142,10 +174,13 @@ always_comb begin
     if (current_state == 3'd1 && (!vblnk_d1_reg) && (!hblnk_d1_reg)) begin
         rgb_nxt = 12'h222; 
         
-        if (in_bar_hp)       rgb_nxt = 12'h2D2;
-        else if (in_bar_spd) rgb_nxt = 12'h2AF;
-        else if (in_bar_dmg) rgb_nxt = 12'hF22;
-        else if (in_panel)   rgb_nxt = 12'h444;
+        if (in_icon_hp && pix_hp_reg != 12'hF0F)        rgb_nxt = pix_hp_reg;
+        else if (in_icon_spd && pix_spd_reg != 12'hF0F) rgb_nxt = pix_spd_reg;
+        else if (in_icon_dmg && pix_dmg_reg != 12'hF0F) rgb_nxt = pix_dmg_reg;
+        else if (in_bar_hp)       rgb_nxt = 12'h2D2;
+        else if (in_bar_spd)      rgb_nxt = 12'h2AF;
+        else if (in_bar_dmg)      rgb_nxt = 12'hF22;
+        else if (in_panel)        rgb_nxt = 12'h444;
         else if (in_b0) begin
             if (my_ready_reg) rgb_nxt = (locked_class_reg == 2'd0) ? ((!enemy_ready) ? 12'hFFF : 12'h0F0) : 12'h111;
             else rgb_nxt = hover0 ? 12'hF55 : 12'hA00;
@@ -165,56 +200,34 @@ always_comb begin
     end
 end
 
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        mouse_left_prev_reg <= 1'b0;
-        
-        hcount_d1_reg <= 11'h0;
-        vcount_d1_reg <= 11'h0;
-        hsync_d1_reg <= 1'b0;
-        vsync_d1_reg <= 1'b0;
-        hblnk_d1_reg <= 1'b0;
-        vblnk_d1_reg <= 1'b0;
-        rgb_d1_reg <= 12'h0;
+always_ff @(posedge clk) begin
+    mouse_left_prev_reg <= mouse_left_prev_nxt;
 
-        class_id_reg <= 2'd0;
-        char_select_btn_reg <= 1'b0;
-        
-        my_ready_reg <= 1'b0;
-        locked_class_reg <= 2'd0;
-        
-        out.vcount <= 11'h0;
-        out.hcount <= 11'h0;
-        out.vsync <= 1'b0;
-        out.hsync <= 1'b0;
-        out.vblnk <= 1'b0;
-        out.hblnk <= 1'b0;
-        out.rgb <= 12'h0;
-    end else begin
-        mouse_left_prev_reg <= mouse_left_prev_nxt;
+    hcount_d1_reg <= hcount_d1_nxt;
+    vcount_d1_reg <= vcount_d1_nxt;
+    hsync_d1_reg <= hsync_d1_nxt;
+    vsync_d1_reg <= vsync_d1_nxt;
+    hblnk_d1_reg <= hblnk_d1_nxt;
+    vblnk_d1_reg <= vblnk_d1_nxt;
+    rgb_d1_reg <= rgb_d1_nxt;
 
-        hcount_d1_reg <= hcount_d1_nxt;
-        vcount_d1_reg <= vcount_d1_nxt;
-        hsync_d1_reg <= hsync_d1_nxt;
-        vsync_d1_reg <= vsync_d1_nxt;
-        hblnk_d1_reg <= hblnk_d1_nxt;
-        vblnk_d1_reg <= vblnk_d1_nxt;
-        rgb_d1_reg <= rgb_d1_nxt;
+    class_id_reg <= class_id_nxt;
+    char_select_btn_reg <= char_select_btn_nxt;
 
-        class_id_reg <= class_id_nxt;
-        char_select_btn_reg <= char_select_btn_nxt;
+    my_ready_reg <= my_ready_nxt;
+    locked_class_reg <= locked_class_nxt;
 
-        my_ready_reg <= my_ready_nxt;
-        locked_class_reg <= locked_class_nxt;
+    out.vcount <= vcount_d1_reg;
+    out.hcount <= hcount_d1_reg;
+    out.vsync <= vsync_d1_reg;
+    out.hsync <= hsync_d1_reg;
+    out.vblnk <= vblnk_d1_reg;
+    out.hblnk <= hblnk_d1_reg;
+    out.rgb <= rgb_nxt;
 
-        out.vcount <= vcount_d1_reg;
-        out.hcount <= hcount_d1_reg;
-        out.vsync <= vsync_d1_reg;
-        out.hsync <= hsync_d1_reg;
-        out.vblnk <= vblnk_d1_reg;
-        out.hblnk <= hblnk_d1_reg;
-        out.rgb <= rgb_nxt;
-    end
+    pix_hp_reg  <= pix_hp_nxt;
+    pix_spd_reg <= pix_spd_nxt;
+    pix_dmg_reg <= pix_dmg_nxt;
 end
 
 endmodule
