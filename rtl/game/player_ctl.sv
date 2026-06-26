@@ -188,7 +188,7 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         world_x_reg <= 16'd0;
         world_y_reg <= 16'd0;
-        hp_reg <= 8'd100;
+        hp_reg <= 8'd0;
         dmg_reg <= 8'd25;
         speed_reg <= 4'd4;
         req_x_reg <= 16'd0;
