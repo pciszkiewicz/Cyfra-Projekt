@@ -35,6 +35,3 @@ dvt_build.log
 
 xcelium.d
 xrun.log
-
-results/*.bit
-results/*.log
