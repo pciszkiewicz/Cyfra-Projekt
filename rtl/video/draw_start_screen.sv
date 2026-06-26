@@ -181,10 +181,10 @@ always_comb begin
  
     mouse_over_button = (mouse_x >= 12'd412 && mouse_x < 12'd612 && mouse_y >= 12'd450 && mouse_y < 12'd510);
  
-    // Poziomy, ciemny granatowy gradient tła
-    bg_color[11:8] = in.hcount[9:6] + 4'h2;
+    // Ciemny granatowy gradient tła
+    bg_color[11:8] = 4'h0;
     bg_color[7:4]  = 4'h1;
-    bg_color[3:0]  = 4'h0;
+    bg_color[3:0]  = in.hcount[10:7] + 4'h2;
  
     // Gradient dla napisu "MTM ARENA"
     title_green = 4'd15 - 4'(in.hcount[9:6]);
