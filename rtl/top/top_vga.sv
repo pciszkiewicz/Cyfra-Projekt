@@ -274,6 +274,7 @@ player_ctl #(
     .apply_heal        (apply_heal),
     .apply_dmg_boost   (apply_dmg_boost),
     .apply_speed_boost (apply_speed_boost),
+    .movement_en       ((current_state == 3'd3) || (current_state == 3'd4)),
     .is_wall_ahead     (is_wall_player)
 );
 

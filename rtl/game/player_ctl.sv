@@ -38,6 +38,7 @@ module player_ctl #(
     input logic apply_heal,
     input logic apply_dmg_boost,
     input logic apply_speed_boost,
+    input logic movement_en,
     input logic is_wall_ahead
 );
 
@@ -164,7 +165,7 @@ always_comb begin
             speed_nxt = speed_reg + 4'd1;
         end
 
-        if (update_tick && (hp_reg > 8'd0) && mouse_rmb) begin
+        if (update_tick && (hp_reg > 8'd0) && mouse_rmb && movement_en) begin
             req_x_nxt = temp_x;
             req_y_nxt = temp_y;
             move_pending_nxt[0] = 1'b1;
