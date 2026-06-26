@@ -200,34 +200,63 @@ always_comb begin
     end
 end
 
-always_ff @(posedge clk) begin
-    mouse_left_prev_reg <= mouse_left_prev_nxt;
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        mouse_left_prev_reg <= 1'b0;
+        
+        hcount_d1_reg <= 11'h0;
+        vcount_d1_reg <= 11'h0;
+        hsync_d1_reg  <= 1'b0;
+        vsync_d1_reg  <= 1'b0;
+        hblnk_d1_reg  <= 1'b0;
+        vblnk_d1_reg  <= 1'b0;
+        rgb_d1_reg    <= 12'h0;
 
-    hcount_d1_reg <= hcount_d1_nxt;
-    vcount_d1_reg <= vcount_d1_nxt;
-    hsync_d1_reg <= hsync_d1_nxt;
-    vsync_d1_reg <= vsync_d1_nxt;
-    hblnk_d1_reg <= hblnk_d1_nxt;
-    vblnk_d1_reg <= vblnk_d1_nxt;
-    rgb_d1_reg <= rgb_d1_nxt;
+        class_id_reg        <= 2'd0;
+        char_select_btn_reg <= 1'b0;
+        my_ready_reg        <= 1'b0;
+        locked_class_reg    <= 2'd0;
 
-    class_id_reg <= class_id_nxt;
-    char_select_btn_reg <= char_select_btn_nxt;
+        out.vcount <= 11'h0;
+        out.hcount <= 11'h0;
+        out.vsync  <= 1'b0;
+        out.hsync  <= 1'b0;
+        out.vblnk  <= 1'b0;
+        out.hblnk  <= 1'b0;
+        out.rgb    <= 12'h0;
 
-    my_ready_reg <= my_ready_nxt;
-    locked_class_reg <= locked_class_nxt;
+        pix_hp_reg  <= 12'h0;
+        pix_spd_reg <= 12'h0;
+        pix_dmg_reg <= 12'h0;
+    end else begin
+        mouse_left_prev_reg <= mouse_left_prev_nxt;
 
-    out.vcount <= vcount_d1_reg;
-    out.hcount <= hcount_d1_reg;
-    out.vsync <= vsync_d1_reg;
-    out.hsync <= hsync_d1_reg;
-    out.vblnk <= vblnk_d1_reg;
-    out.hblnk <= hblnk_d1_reg;
-    out.rgb <= rgb_nxt;
+        hcount_d1_reg <= hcount_d1_nxt;
+        vcount_d1_reg <= vcount_d1_nxt;
+        hsync_d1_reg  <= hsync_d1_nxt;
+        vsync_d1_reg  <= vsync_d1_nxt;
+        hblnk_d1_reg  <= hblnk_d1_nxt;
+        vblnk_d1_reg  <= vblnk_d1_nxt;
+        rgb_d1_reg    <= rgb_d1_nxt;
 
-    pix_hp_reg  <= pix_hp_nxt;
-    pix_spd_reg <= pix_spd_nxt;
-    pix_dmg_reg <= pix_dmg_nxt;
+        class_id_reg        <= class_id_nxt;
+        char_select_btn_reg <= char_select_btn_nxt;
+
+        my_ready_reg     <= my_ready_nxt;
+        locked_class_reg <= locked_class_nxt;
+
+        out.vcount <= vcount_d1_reg;
+        out.hcount <= hcount_d1_reg;
+        out.vsync  <= vsync_d1_reg;
+        out.hsync  <= hsync_d1_reg;
+        out.vblnk  <= vblnk_d1_reg;
+        out.hblnk  <= hblnk_d1_reg;
+        out.rgb    <= rgb_nxt;
+
+        pix_hp_reg  <= pix_hp_nxt;
+        pix_spd_reg <= pix_spd_nxt;
+        pix_dmg_reg <= pix_dmg_nxt;
+    end
 end
 
 endmodule
